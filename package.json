@@ -1,0 +1,32 @@
+{
+  "name": "regression-test-management-platform",
+  "version": "1.0.0",
+  "description": "Mono repo MERN tabanlı regresyon test yönetim platformu iskeleti",
+  "main": "index.js",
+  "scripts": {
+    "dev:server": "npm run dev --prefix server",
+    "dev:client": "npm run dev --prefix client",
+    "dev": "concurrently \"npm run dev --prefix server\" \"npm run dev --prefix client\"",
+    "build": "npm run build --prefix server && npm run build --prefix client",
+    "start": "npm run start --prefix server"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mustaffaerdogan/regression-test-management-platform.git"
+  },
+  "keywords": [
+    "mern",
+    "regression-tests",
+    "qa"
+  ],
+  "author": "",
+  "license": "MIT",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/mustaffaerdogan/regression-test-management-platform/issues"
+  },
+  "homepage": "https://github.com/mustaffaerdogan/regression-test-management-platform#readme",
+  "devDependencies": {
+    "concurrently": "^9.0.1"
+  }
+}
