@@ -1,6 +1,7 @@
-import { createBrowserRouter, RouterProvider, Navigate } from 'react-router-dom';
+import { createBrowserRouter, RouterProvider } from 'react-router-dom';
 import { PublicLayout } from '../layouts/PublicLayout';
 import { ProtectedLayout } from '../layouts/ProtectedLayout';
+import { Landing } from '../pages/Landing';
 import { Login } from '../pages/Auth/Login';
 import { Register } from '../pages/Auth/Register';
 import { useAuth } from '../hooks/useAuth';
@@ -42,6 +43,10 @@ const router = createBrowserRouter([
     element: <PublicLayout />,
     children: [
       {
+        path: '/',
+        element: <Landing />,
+      },
+      {
         path: '/login',
         element: <Login />,
       },
@@ -59,10 +64,6 @@ const router = createBrowserRouter([
         element: <Dashboard />,
       },
     ],
-  },
-  {
-    path: '/',
-    element: <Navigate to="/dashboard" replace />,
   },
 ]);
 

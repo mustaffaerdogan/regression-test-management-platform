@@ -2,8 +2,8 @@ import { useState } from 'react';
 import type { FormEvent } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
-import { FormInput } from '../../components/FormInput';
-import { Button } from '../../components/Button';
+import { ThemeToggle } from '../../components/ThemeToggle';
+import { LanguageToggle } from '../../components/LanguageToggle';
 
 export const Register = () => {
   const navigate = useNavigate();
@@ -12,6 +12,7 @@ export const Register = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [agreeToTerms, setAgreeToTerms] = useState(false);
   const [errors, setErrors] = useState<{
     name?: string;
     email?: string;
@@ -30,7 +31,7 @@ export const Register = () => {
     } = {};
 
     if (!name.trim()) {
-      newErrors.name = 'Name is required';
+      newErrors.name = 'Full name is required';
     }
 
     if (!email.trim()) {
@@ -63,6 +64,11 @@ export const Register = () => {
       return;
     }
 
+    if (!agreeToTerms) {
+      setErrors({ general: 'You must agree to the Terms & Conditions' });
+      return;
+    }
+
     setLoading(true);
 
     try {
@@ -78,84 +84,151 @@ export const Register = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full space-y-8">
-        <div>
-          <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
-            Create your account
-          </h2>
-          <p className="mt-2 text-center text-sm text-gray-600">
-            Or{' '}
-            <Link
-              to="/login"
-              className="font-medium text-blue-600 hover:text-blue-500"
-            >
-              sign in to your existing account
-            </Link>
-          </p>
+    <div className="min-h-screen bg-gradient-to-br from-white via-indigo-50/30 to-purple-50/30 dark:from-[#0f0f0f] dark:via-indigo-950/20 dark:to-purple-950/20 flex items-center justify-center p-4">
+      {/* Background decoration */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-indigo-200/20 dark:bg-indigo-900/10 rounded-full blur-3xl"></div>
+        <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-purple-200/20 dark:bg-purple-900/10 rounded-full blur-3xl"></div>
+      </div>
+
+      {/* Header */}
+      <header className="absolute top-0 left-0 right-0 z-10">
+        <div className="max-w-7xl mx-auto px-6 lg:px-8 py-4">
+          <div className="flex justify-end items-center gap-3">
+            <ThemeToggle />
+            <LanguageToggle />
+          </div>
         </div>
-        <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
+      </header>
+
+      {/* Register Card */}
+      <div className="relative z-10 w-full max-w-[480px]">
+        <div className="glass rounded-2xl p-8 shadow-soft dark:shadow-soft-dark border border-gray-200/50 dark:border-gray-800/50">
+          <div className="mb-8">
+            <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">Create Your Account</h1>
+            <p className="text-gray-600 dark:text-gray-400">Get started with your free account today</p>
+          </div>
+
           {errors.general && (
-            <div className="rounded-md bg-red-50 p-4">
-              <p className="text-sm text-red-800">{errors.general}</p>
+            <div className="mb-6 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl">
+              <p className="text-sm text-red-800 dark:text-red-200">{errors.general}</p>
             </div>
           )}
 
-          <div className="max-w-[420px] mx-auto">
-            <FormInput
-              id="name"
-              type="text"
-              label="Full name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              error={errors.name}
-              autoComplete="name"
-              required
-            />
+          <form onSubmit={handleSubmit} className="space-y-5">
+            <div>
+              <label htmlFor="name" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Full Name
+              </label>
+              <input
+                id="name"
+                type="text"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                className="w-full px-4 py-3 rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
+                placeholder="John Doe"
+                autoComplete="name"
+                required
+              />
+              {errors.name && (
+                <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.name}</p>
+              )}
+            </div>
 
-            <FormInput
-              id="email"
-              type="email"
-              label="Email address"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              error={errors.email}
-              autoComplete="email"
-              required
-            />
+            <div>
+              <label htmlFor="email" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Email
+              </label>
+              <input
+                id="email"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="w-full px-4 py-3 rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
+                placeholder="you@example.com"
+                autoComplete="email"
+                required
+              />
+              {errors.email && (
+                <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.email}</p>
+              )}
+            </div>
 
-            <FormInput
-              id="password"
-              type="password"
-              label="Password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              error={errors.password}
-              autoComplete="new-password"
-              helperText="Must be at least 6 characters"
-              required
-            />
+            <div>
+              <label htmlFor="password" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Password
+              </label>
+              <input
+                id="password"
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="w-full px-4 py-3 rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
+                placeholder="••••••••"
+                autoComplete="new-password"
+                required
+              />
+              {errors.password && (
+                <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.password}</p>
+              )}
+            </div>
 
-            <FormInput
-              id="confirmPassword"
-              type="password"
-              label="Confirm password"
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              error={errors.confirmPassword}
-              autoComplete="new-password"
-              required
-            />
-          </div>
+            <div>
+              <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Confirm Password
+              </label>
+              <input
+                id="confirmPassword"
+                type="password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                className="w-full px-4 py-3 rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
+                placeholder="••••••••"
+                autoComplete="new-password"
+                required
+              />
+              {errors.confirmPassword && (
+                <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.confirmPassword}</p>
+              )}
+            </div>
 
-          <div className="max-w-[420px] mx-auto">
-            <Button type="submit" loading={loading} className="w-full">
-              Create account
-            </Button>
-          </div>
-        </form>
+            <div className="flex items-start">
+              <input
+                id="terms"
+                type="checkbox"
+                checked={agreeToTerms}
+                onChange={(e) => setAgreeToTerms(e.target.checked)}
+                className="mt-1 w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+                required
+              />
+              <label htmlFor="terms" className="ml-2 text-sm text-gray-700 dark:text-gray-300">
+                I agree to{' '}
+                <Link to="/terms" className="text-indigo-600 dark:text-indigo-400 hover:underline">
+                  Terms & Conditions
+                </Link>
+              </label>
+            </div>
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-full shadow-soft dark:shadow-soft-dark transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {loading ? 'Creating account...' : 'Sign Up'}
+            </button>
+          </form>
+
+          <p className="mt-6 text-center text-sm text-gray-600 dark:text-gray-400">
+            Already have an account?{' '}
+            <Link
+              to="/login"
+              className="font-medium text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300"
+            >
+              Login
+            </Link>
+          </p>
+        </div>
       </div>
     </div>
   );
 };
-

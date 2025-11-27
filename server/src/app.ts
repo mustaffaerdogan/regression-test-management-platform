@@ -21,12 +21,20 @@ app.use(
 );
 
 // Rate limiting - prevent brute force attacks
+// Development: More lenient, Production: Stricter
+const isDevelopment = process.env.NODE_ENV !== 'production';
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // Limit each IP to 100 requests per windowMs
+  max: isDevelopment ? 1000 : 100, // Development: 1000 requests, Production: 100 requests
   message: 'Too many requests from this IP, please try again later.',
   standardHeaders: true,
   legacyHeaders: false,
+  skip: (req) => {
+    // Skip rate limiting for localhost in development
+    if (isDevelopment && req.ip === '::1') return true;
+    if (isDevelopment && req.ip === '127.0.0.1') return true;
+    return false;
+  },
 });
 
 // Apply rate limiting to all requests
