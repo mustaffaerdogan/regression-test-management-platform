@@ -6,6 +6,9 @@ import { Login } from '../pages/Auth/Login';
 import { Register } from '../pages/Auth/Register';
 import { RegressionSetListPage } from '../pages/RegressionSets/RegressionSetListPage';
 import { RegressionSetDetailPage } from '../pages/RegressionSets/RegressionSetDetailPage';
+import { TestRunHistoryPage } from '../pages/TestRuns/TestRunHistoryPage';
+import { TestRunDetailPage } from '../pages/TestRuns/TestRunDetailPage';
+import { TestRunExecutePage } from '../pages/TestRuns/TestRunExecutePage';
 import { useAuth } from '../hooks/useAuth';
 
 // Placeholder dashboard component
@@ -72,6 +75,18 @@ const router = createBrowserRouter([
       {
         path: '/regression-sets/:id',
         element: <RegressionSetDetailPage />,
+      },
+      {
+        path: '/test-runs',
+        element: <TestRunHistoryPage />,
+      },
+      {
+        path: '/test-runs/:runId',
+        element: <TestRunDetailPage />,
+      },
+      {
+        path: '/test-runs/:runId/execute',
+        element: <TestRunExecutePage />,
       },
     ],
   },

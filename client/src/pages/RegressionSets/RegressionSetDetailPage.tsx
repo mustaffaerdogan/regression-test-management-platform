@@ -5,6 +5,7 @@ import {
   deleteTestCase,
   getRegressionSetById,
 } from '../../api/regressionSets';
+import { startRun } from '../../api/testRuns';
 import type { RegressionSet, TestCase } from '../../types/regression';
 import { RegressionSetFormModal } from '../../components/RegressionSetFormModal';
 import { TestCaseFormModal } from '../../components/TestCaseFormModal';
@@ -33,6 +34,7 @@ export const RegressionSetDetailPage = () => {
   const [editingTestCase, setEditingTestCase] = useState<TestCase | undefined>(undefined);
 
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [startingRun, setStartingRun] = useState(false);
 
   const fetchData = async () => {
     if (!id) return;
@@ -90,6 +92,23 @@ export const RegressionSetDetailPage = () => {
     await fetchData();
     setSuccessMessage('Regression set saved successfully');
     setTimeout(() => setSuccessMessage(null), 2000);
+  };
+
+  const handleStartRun = async () => {
+    if (!regressionSet) return;
+    setStartingRun(true);
+    setError(null);
+    try {
+      const response = await startRun(regressionSet._id);
+      const runId = response.data?.runId;
+      if (runId) {
+        navigate(`/test-runs/${runId}/execute`);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to start test run');
+    } finally {
+      setStartingRun(false);
+    }
   };
 
   const handleTestCaseSaved = async () => {
@@ -155,6 +174,15 @@ export const RegressionSetDetailPage = () => {
           </p>
         </div>
         <div className="flex gap-3">
+          <Button
+            type="button"
+            className="px-4 py-2 rounded-full"
+            onClick={handleStartRun}
+            disabled={startingRun || (regressionSet.testCases?.length ?? 0) === 0}
+            loading={startingRun}
+          >
+            Start Run
+          </Button>
           <Button
             type="button"
             variant="secondary"

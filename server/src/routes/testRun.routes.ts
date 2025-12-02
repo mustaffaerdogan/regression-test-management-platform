@@ -22,12 +22,13 @@ const router = Router();
 // All routes are protected
 router.use(authMiddleware);
 
+// IMPORTANT: define static routes before dynamic :runId routes to avoid conflicts
+router.get('/history', validate(historyQueryValidation), listRunsHistory);
 router.post('/start/:regressionSetId', validate(startRunValidation), startRun);
 router.get('/:runId', validate(runIdParamValidation), getRun);
 router.get('/:runId/next', validate(runIdParamValidation), getNextRunItem);
 router.put('/update-item/:itemId', validate(updateRunItemValidation), updateRunItem);
 router.put('/cancel/:runId', validate(cancelRunValidation), cancelRun);
-router.get('/history', validate(historyQueryValidation), listRunsHistory);
 
 export default router;
 

@@ -175,7 +175,10 @@ export const getNextRunItem = async (
 
     const nextItem = await RunItem.findOne({ run: run._id, status: 'Not Executed' })
       .sort({ order: 1 })
-      .populate('testCase', 'testCaseId module testScenario testCase expectedResult status')
+      .populate(
+        'testCase',
+        'testCaseId userType platform module testScenario testCase preConditions testData testStep expectedResult actualResults status',
+      )
       .lean()
       .exec();
 
@@ -185,6 +188,7 @@ export const getNextRunItem = async (
         message: 'Run completed',
         data: {
           done: true,
+          run,
         },
       });
       return;
@@ -196,6 +200,7 @@ export const getNextRunItem = async (
       data: {
         done: false,
         item: nextItem,
+        run,
       },
     });
   } catch (error) {
