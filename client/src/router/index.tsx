@@ -4,6 +4,8 @@ import { ProtectedLayout } from '../layouts/ProtectedLayout';
 import { Landing } from '../pages/Landing';
 import { Login } from '../pages/Auth/Login';
 import { Register } from '../pages/Auth/Register';
+import { RegressionSetListPage } from '../pages/RegressionSets/RegressionSetListPage';
+import { RegressionSetDetailPage } from '../pages/RegressionSets/RegressionSetDetailPage';
 import { useAuth } from '../hooks/useAuth';
 
 // Placeholder dashboard component
@@ -62,6 +64,14 @@ const router = createBrowserRouter([
       {
         path: '/dashboard',
         element: <Dashboard />,
+      },
+      {
+        path: '/regression-sets',
+        element: <RegressionSetListPage />,
+      },
+      {
+        path: '/regression-sets/:id',
+        element: <RegressionSetDetailPage />,
       },
     ],
   },
