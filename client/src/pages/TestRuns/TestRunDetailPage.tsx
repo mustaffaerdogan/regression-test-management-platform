@@ -48,7 +48,7 @@ export const TestRunDetailPage = () => {
   }
 
   if (!user) {
-    return <Navigate to="/login" replace />;
+    return <Navigate to="/" replace />;
   }
 
   if (loading) {

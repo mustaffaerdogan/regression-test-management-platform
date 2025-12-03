@@ -2,8 +2,6 @@ import { createBrowserRouter, RouterProvider } from 'react-router-dom';
 import { PublicLayout } from '../layouts/PublicLayout';
 import { ProtectedLayout } from '../layouts/ProtectedLayout';
 import { Landing } from '../pages/Landing';
-import { Login } from '../pages/Auth/Login';
-import { Register } from '../pages/Auth/Register';
 import { RegressionSetListPage } from '../pages/RegressionSets/RegressionSetListPage';
 import { RegressionSetDetailPage } from '../pages/RegressionSets/RegressionSetDetailPage';
 import { TestRunHistoryPage } from '../pages/TestRuns/TestRunHistoryPage';
@@ -18,14 +16,6 @@ const router = createBrowserRouter([
       {
         path: '/',
         element: <Landing />,
-      },
-      {
-        path: '/login',
-        element: <Login />,
-      },
-      {
-        path: '/register',
-        element: <Register />,
       },
     ],
   },

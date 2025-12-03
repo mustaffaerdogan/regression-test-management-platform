@@ -59,7 +59,7 @@ export const TestRunExecutePage = () => {
   }
 
   if (!user) {
-    return <Navigate to="/login" replace />;
+    return <Navigate to="/" replace />;
   }
 
   const handleExecute = async (status: RunItemStatus, results: string) => {

@@ -1,8 +1,34 @@
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
+import { useEffect, useState } from 'react';
 import { ThemeToggle } from '../components/ThemeToggle';
 import { LanguageToggle } from '../components/LanguageToggle';
+import { Modal } from '../components/Modal';
+import { LoginForm } from './Auth/components/LoginForm';
+import { RegisterForm } from './Auth/components/RegisterForm';
+import { useQuery } from '../hooks/useQuery';
 
 export const Landing = () => {
+  const navigate = useNavigate();
+  const query = useQuery();
+
+  const [showLogin, setShowLogin] = useState(false);
+  const [showRegister, setShowRegister] = useState(false);
+
+  // URL -> modal
+  useEffect(() => {
+    const auth = query.get('auth');
+    setShowLogin(auth === 'login');
+    setShowRegister(auth === 'register');
+  }, [query]);
+
+  const openLogin = () => navigate('/?auth=login');
+  const openRegister = () => navigate('/?auth=register');
+
+  // modal close -> clear url
+  const closeModal = () => {
+    navigate('/', { replace: true });
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-white via-indigo-50/30 to-purple-50/30 dark:from-[#0f0f0f] dark:via-indigo-950/20 dark:to-purple-950/20">
       {/* Header */}
@@ -13,18 +39,20 @@ export const Landing = () => {
               Regression Test Suite
             </Link>
             <div className="flex items-center gap-3">
-              <Link
-                to="/login"
+              <button
+                type="button"
+                onClick={openLogin}
                 className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors"
               >
                 Login
-              </Link>
-              <Link
-                to="/register"
+              </button>
+              <button
+                type="button"
+                onClick={openRegister}
                 className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-full transition-colors"
               >
                 Sign Up
-              </Link>
+              </button>
               <ThemeToggle />
               <LanguageToggle />
             </div>
@@ -46,18 +74,20 @@ export const Landing = () => {
               Manage multi-platform regression tests, execute test cases step-by-step, and analyze results with powerful dashboards.
             </p>
             <div className="flex flex-wrap gap-4">
-              <Link
-                to="/register"
+              <button
+                type="button"
+                onClick={openRegister}
                 className="px-8 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-full shadow-soft dark:shadow-soft-dark transition-all hover:scale-105"
               >
                 Get Started
-              </Link>
-              <Link
-                to="/dashboard"
+              </button>
+              <button
+                type="button"
+                onClick={openLogin}
                 className="px-8 py-3 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-900 dark:text-white font-medium rounded-full border border-gray-200 dark:border-gray-700 shadow-soft dark:shadow-soft-dark transition-all hover:scale-105"
               >
                 Try Demo
-              </Link>
+              </button>
             </div>
           </div>
           <div className="relative">
@@ -174,6 +204,16 @@ export const Landing = () => {
           </div>
         </div>
       </footer>
+
+      {/* LOGIN MODAL */}
+      <Modal isOpen={showLogin} onClose={closeModal} title="Login">
+        <LoginForm />
+      </Modal>
+
+      {/* REGISTER MODAL */}
+      <Modal isOpen={showRegister} onClose={closeModal} title="Register">
+        <RegisterForm />
+      </Modal>
     </div>
   );
 };

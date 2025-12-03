@@ -17,7 +17,7 @@ export const ProtectedLayout = () => {
   }
 
   if (!user) {
-    return <Navigate to="/login" replace />;
+    return <Navigate to="/" replace />;
   }
 
   return (
@@ -80,7 +80,7 @@ export const ProtectedLayout = () => {
               variant="secondary"
               onClick={() => {
                 logout();
-                navigate('/login');
+                navigate('/');
               }}
               className="px-3 py-1"
             >
