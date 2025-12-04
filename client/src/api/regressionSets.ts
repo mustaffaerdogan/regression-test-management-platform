@@ -143,4 +143,37 @@ export const deleteTestCase = async (caseId: string): Promise<ApiResponse<null>>
   return handleResponse<null>(response);
 };
 
+export interface ImportCsvResponse {
+  importedCount: number;
+  skipped: Array<{ row: number; reason: string }>;
+}
+
+export const importTestCasesCsv = async (
+  regressionSetId: string,
+  file: File,
+): Promise<ApiResponse<ImportCsvResponse>> => {
+  const formData = new FormData();
+  formData.append('file', file);
+
+  const token = localStorage.getItem('token');
+  const response = await fetch(
+    `${API_BASE_URL}/regression-sets/${regressionSetId}/test-cases/import`,
+    {
+      method: 'POST',
+      headers: {
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: formData,
+    },
+  );
+
+  const json = (await response.json()) as ApiResponse<ImportCsvResponse>;
+
+  if (!response.ok || !json.success) {
+    throw new Error(json.message || 'Failed to import CSV');
+  }
+
+  return json;
+};
+
 

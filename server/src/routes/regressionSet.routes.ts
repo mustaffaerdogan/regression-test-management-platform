@@ -15,12 +15,14 @@ import {
   getTestCasesForRegressionSet,
   updateTestCase,
 } from '../controllers/testCase.controller';
+import { importTestCasesCsv } from '../controllers/testCaseImport.controller';
 import {
   createRegressionSetValidation,
   listRegressionSetsValidation,
   updateRegressionSetValidation,
 } from '../validation/regressionSet.validation';
 import { createTestCaseValidation, updateTestCaseValidation } from '../validation/testCase.validation';
+import { uploadCsv } from '../middleware/uploadCsv';
 
 const router = Router();
 
@@ -37,6 +39,7 @@ router.delete('/:id', deleteRegressionSet);
 // Nested test case routes under a regression set
 router.post('/:id/test-cases', validate(createTestCaseValidation), createTestCase);
 router.get('/:id/test-cases', getTestCasesForRegressionSet);
+router.post('/:id/test-cases/import', uploadCsv.single('file'), importTestCasesCsv);
 
 // Test case routes by case id
 router.get('/test-cases/:caseId', getTestCaseById);

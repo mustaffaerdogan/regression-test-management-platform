@@ -11,6 +11,7 @@ import { RegressionSetFormModal } from '../../components/RegressionSetFormModal'
 import { TestCaseFormModal } from '../../components/TestCaseFormModal';
 import { TestCaseTable } from '../../components/TestCaseTable';
 import { Button } from '../../components/Button';
+import { ImportCsvModal } from './components/ImportCsvModal';
 
 const formatDate = (value?: string): string => {
   if (!value) return '';
@@ -31,6 +32,7 @@ export const RegressionSetDetailPage = () => {
 
   const [isSetModalOpen, setIsSetModalOpen] = useState(false);
   const [isTestCaseModalOpen, setIsTestCaseModalOpen] = useState(false);
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [editingTestCase, setEditingTestCase] = useState<TestCase | undefined>(undefined);
 
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -210,13 +212,23 @@ export const RegressionSetDetailPage = () => {
       <section className="space-y-4">
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Test Cases</h2>
-          <Button
-            type="button"
-            className="px-4 py-2 rounded-full"
-            onClick={handleAddTestCase}
-          >
-            Add Test Case
-          </Button>
+          <div className="flex gap-3">
+            <Button
+              type="button"
+              variant="secondary"
+              className="px-4 py-2"
+              onClick={() => setIsImportModalOpen(true)}
+            >
+              Import CSV
+            </Button>
+            <Button
+              type="button"
+              className="px-4 py-2 rounded-full"
+              onClick={handleAddTestCase}
+            >
+              Add Test Case
+            </Button>
+          </div>
         </div>
         <TestCaseTable
           testCases={regressionSet.testCases ?? []}
@@ -238,6 +250,13 @@ export const RegressionSetDetailPage = () => {
         onSuccess={handleTestCaseSaved}
         regressionSetId={regressionSet._id}
         initialValues={editingTestCase}
+      />
+
+      <ImportCsvModal
+        open={isImportModalOpen}
+        onClose={() => setIsImportModalOpen(false)}
+        regressionSetId={regressionSet._id}
+        onImported={fetchData}
       />
     </div>
   );
