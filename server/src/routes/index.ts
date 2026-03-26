@@ -5,6 +5,7 @@ import authRoutes from './auth.routes';
 import regressionSetRoutes from './regressionSet.routes';
 import testRunRoutes from './testRun.routes';
 import dashboardRoutes from './dashboard.routes';
+import teamRoutes from './team.routes';
 
 const router = Router();
 
@@ -13,6 +14,8 @@ router.use('/auth', authRoutes);
 router.use('/regression-sets', regressionSetRoutes);
 router.use('/test-runs', testRunRoutes);
 router.use('/dashboard', dashboardRoutes);
+router.use('/teams', teamRoutes);
 
 export default router;
+
 

@@ -71,6 +71,18 @@ export const ProtectedLayout = () => {
             >
               Test Runs
             </NavLink>
+
+            <NavLink
+              to="/teams"
+              className={({ isActive }) =>
+                `hover:text-indigo-600 ${
+                  isActive ? 'text-indigo-600 font-semibold' : 'text-gray-700 dark:text-gray-300'
+                }`
+              }
+            >
+              Teams
+            </NavLink>
+
           </nav>
 
           {/* Right: Theme toggle + Logout */}

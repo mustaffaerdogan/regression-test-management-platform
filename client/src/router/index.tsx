@@ -8,6 +8,8 @@ import { TestRunHistoryPage } from '../pages/TestRuns/TestRunHistoryPage';
 import { TestRunDetailPage } from '../pages/TestRuns/TestRunDetailPage';
 import { TestRunExecutePage } from '../pages/TestRuns/TestRunExecutePage';
 import { DashboardPage } from '../pages/Dashboard/DashboardPage';
+import { TeamListPage } from '../pages/Teams/TeamListPage';
+import { TeamDetailPage } from '../pages/Teams/TeamDetailPage';
 
 const router = createBrowserRouter([
   {
@@ -46,6 +48,14 @@ const router = createBrowserRouter([
         path: '/test-runs/:runId/execute',
         element: <TestRunExecutePage />,
       },
+      {
+        path: '/teams',
+        element: <TeamListPage />,
+      },
+      {
+        path: '/teams/:id',
+        element: <TeamDetailPage />,
+      },
     ],
   },
 ]);
@@ -53,4 +63,3 @@ const router = createBrowserRouter([
 export const AppRouter = () => {
   return <RouterProvider router={router} />;
 };
-

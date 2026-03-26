@@ -1,8 +1,8 @@
 import mongoose from 'mongoose';
 
-const { MONGODB_URI, MONGODB_DB } = process.env;
-
 export const connectDatabase = async (): Promise<void> => {
+  const { MONGODB_URI, MONGODB_DB } = process.env;
+
   if (!MONGODB_URI) {
     throw new Error('Missing MONGODB_URI environment variable.');
   }
@@ -23,4 +23,3 @@ export const connectDatabase = async (): Promise<void> => {
 export const disconnectDatabase = async (): Promise<void> => {
   await mongoose.connection.close();
 };
-
