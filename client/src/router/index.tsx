@@ -10,6 +10,7 @@ import { TestRunExecutePage } from '../pages/TestRuns/TestRunExecutePage';
 import { DashboardPage } from '../pages/Dashboard/DashboardPage';
 import { TeamListPage } from '../pages/Teams/TeamListPage';
 import { TeamDetailPage } from '../pages/Teams/TeamDetailPage';
+import { AICasesPage } from '../pages/AICases/AICasesPage';
 
 const router = createBrowserRouter([
   {
@@ -55,6 +56,10 @@ const router = createBrowserRouter([
       {
         path: '/teams/:id',
         element: <TeamDetailPage />,
+      },
+      {
+        path: '/ai-cases',
+        element: <AICasesPage />,
       },
     ],
   },

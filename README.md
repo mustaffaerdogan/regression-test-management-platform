@@ -45,6 +45,14 @@ A comprehensive SaaS platform for managing regression test suites, test cases, a
 - Join teams with invite code
 - Team-based access control for shared regression assets
 
+### 🤖 AI Cases (Beta)
+- New `AI Cases` screen in authenticated header navigation
+- Paste a user story and acceptance criteria
+- Generate AI-backed test case suggestions with an LLM
+- Output is normalized server-side and limited to **max 3 test cases per request**
+- Select test cases with checkboxes, accept them, then create a regression set
+- Only selected test cases are added to the created regression set
+
 ### 📝 Test Case Management
 - Full CRUD operations for test cases
 - **CSV Bulk Import** - Import multiple test cases at once
@@ -411,6 +419,37 @@ TC-101,Registered,Web,Login,User can login,Correct email and password login,User
 | Method | Endpoint | Description | Auth Required |
 |--------|----------|-------------|---------------|
 | `GET` | `/api/status` | Health check endpoint | ❌ |
+
+### AI Cases Endpoints
+
+| Method | Endpoint | Description | Auth Required |
+|--------|----------|-------------|---------------|
+| `POST` | `/api/ai-cases/generate` | Generate normalized AI test case suggestions from user story and criteria | ✅ |
+
+**Request Example:**
+```json
+{
+  "userStory": "As a user, I want to reset my password so that I can recover my account.",
+  "acceptanceCriteria": [
+    "User receives a reset email",
+    "Reset link expires in 15 minutes",
+    "Expired token returns an error"
+  ]
+}
+```
+
+**Response Notes (AI):**
+- Server enforces output normalization and caps results to 3 test cases.
+- Response includes `limits.maxTestCasesPerRequest` and `limits.generatedTestCases`.
+- If provider rate-limit/quota is hit, API can return `429`.
+- If provider response is invalid/unparseable after retry, API returns `502`.
+
+**Server Environment (AI):**
+```env
+OPENAI_API_KEY=your-openai-api-key
+OPENAI_MODEL=gpt-4o-mini
+# OPENAI_BASE_URL=https://api.openai.com/v1
+```
 
 ## 📁 Project Structure
 

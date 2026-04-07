@@ -82,6 +82,17 @@ export const ProtectedLayout = () => {
               Teams
             </NavLink>
 
+            <NavLink
+              to="/ai-cases"
+              className={({ isActive }) =>
+                `hover:text-indigo-600 ${
+                  isActive ? 'text-indigo-600 font-semibold' : 'text-gray-700 dark:text-gray-300'
+                }`
+              }
+            >
+              AI Cases
+            </NavLink>
+
           </nav>
 
           {/* Right: Profile menu */}
