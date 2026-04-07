@@ -36,6 +36,7 @@ export const getRegressionSets = async (
 
   if (params.search) url.searchParams.set('search', params.search);
   if (params.platform) url.searchParams.set('platform', params.platform);
+  if (params.teamId) url.searchParams.set('teamId', params.teamId);
   if (params.page) url.searchParams.set('page', String(params.page));
   if (params.limit) url.searchParams.set('limit', String(params.limit));
 

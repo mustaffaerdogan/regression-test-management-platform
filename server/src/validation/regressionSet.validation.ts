@@ -14,6 +14,7 @@ export const createRegressionSetValidation = [
     .isIn(['Web', 'iOS', 'Android', 'TV'])
     .withMessage('Platform must be one of Web, iOS, Android, TV'),
   body('description').optional().isString().withMessage('Description must be a string'),
+  body('teamId').optional().isMongoId().withMessage('teamId must be a valid mongo id'),
 ];
 
 export const updateRegressionSetValidation = [
@@ -31,6 +32,7 @@ export const updateRegressionSetValidation = [
 ];
 
 export const listRegressionSetsValidation = [
+  query('teamId').optional().isMongoId().withMessage('teamId must be a valid mongo id'),
   query('platform')
     .optional()
     .isIn(['Web', 'iOS', 'Android', 'TV'])

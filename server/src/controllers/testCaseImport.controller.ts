@@ -4,6 +4,7 @@ import RegressionSet from '../models/RegressionSet.model';
 import TestCase from '../models/TestCase.model';
 import { ApiError } from '../middleware/error.middleware';
 import { Types } from 'mongoose';
+import { canAccessRegressionSet } from '../utils/authorization';
 
 interface AuthedRequest extends Request {
   user?: {
@@ -32,7 +33,7 @@ export const importTestCasesCsv = async (
       throw error;
     }
 
-    // Verify Regression Set belongs to the user
+    // Verify user can access Regression Set (owner or team member)
     const regSet = await RegressionSet.findById(regressionSetId);
     if (!regSet) {
       const error: ApiError = new Error('Regression set not found');
@@ -40,7 +41,8 @@ export const importTestCasesCsv = async (
       throw error;
     }
 
-    if (regSet.createdBy.toString() !== userId) {
+    const allowed = await canAccessRegressionSet(regSet as any, userId);
+    if (!allowed) {
       const error: ApiError = new Error('Unauthorized');
       error.statusCode = 403;
       throw error;

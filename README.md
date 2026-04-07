@@ -37,7 +37,13 @@ A comprehensive SaaS platform for managing regression test suites, test cases, a
 - Create, read, update, and delete regression sets
 - Platform support: Web, iOS, Android, TV
 - Search and filter regression sets
-- User-scoped data isolation
+- Team-scoped visibility with optional `teamId`
+- Team members can view and manage shared regression sets
+
+### 👥 Team Collaboration
+- Create teams and invite members
+- Join teams with invite code
+- Team-based access control for shared regression assets
 
 ### 📝 Test Case Management
 - Full CRUD operations for test cases
@@ -51,6 +57,7 @@ A comprehensive SaaS platform for managing regression test suites, test cases, a
 - Step-by-step execution interface
 - Real-time progress tracking
 - Pass/Fail/Skip status updates
+- Bulk mark remaining run items (Pass/Fail/Skipped)
 - Run cancellation support
 - Execution history with pagination
 
@@ -64,7 +71,7 @@ A comprehensive SaaS platform for managing regression test suites, test cases, a
 
 ### 🎨 User Interface
 - Modern, responsive design with Tailwind CSS
-- Dark/Light mode support
+- Dark/Light mode support (available in profile menu after login)
 - Mobile-friendly navigation with drawer sidebar
 - Modal-based forms and dialogs
 - Real-time loading states and error handling
@@ -267,6 +274,7 @@ Authorization: Bearer <your-jwt-token>
 **Query Parameters (GET /api/regression-sets):**
 - `platform`: Filter by platform (Web, iOS, Android, TV)
 - `search`: Search in name and description
+- `teamId`: Filter by team (user must be a team member)
 - `page`: Page number (default: 1)
 - `limit`: Items per page (default: 10)
 
@@ -312,8 +320,31 @@ TC-101,Registered,Web,Login,User can login,Correct email and password login,User
 | `GET` | `/api/test-runs/:runId` | Get run details with items | ✅ |
 | `GET` | `/api/test-runs/:runId/next` | Get next unexecuted item | ✅ |
 | `PUT` | `/api/test-runs/update-item/:itemId` | Update run item status | ✅ |
+| `PUT` | `/api/test-runs/:runId/bulk-update` | Bulk update remaining run items | ✅ |
 | `PUT` | `/api/test-runs/cancel/:runId` | Cancel a test run | ✅ |
 | `GET` | `/api/test-runs/history` | Get run history with pagination | ✅ |
+
+**Bulk Update Run Request:**
+```json
+{
+  "status": "Pass"
+}
+```
+
+### Team Endpoints
+
+| Method | Endpoint | Description | Auth Required |
+|--------|----------|-------------|---------------|
+| `POST` | `/api/teams` | Create team | ✅ |
+| `GET` | `/api/teams` | List my teams | ✅ |
+| `GET` | `/api/teams/:id` | Get team detail | ✅ |
+| `PUT` | `/api/teams/:id` | Update team (owner) | ✅ |
+| `DELETE` | `/api/teams/:id` | Delete team (owner) | ✅ |
+| `POST` | `/api/teams/:id/invite` | Invite member by email | ✅ |
+| `POST` | `/api/teams/join` | Join team by invite code | ✅ |
+| `POST` | `/api/teams/:id/regenerate-invite` | Regenerate invite code | ✅ |
+| `DELETE` | `/api/teams/:id/members/:userId` | Remove member (owner) | ✅ |
+| `DELETE` | `/api/teams/:id/leave` | Leave team | ✅ |
 
 **Start Run Response:**
 ```json
@@ -489,7 +520,7 @@ regression-test-management-platform/
 - Create regression sets for different platforms (Web, iOS, Android, TV)
 - Organize test cases by regression set
 - Search and filter regression sets
-- Full CRUD operations with ownership validation
+- Full CRUD operations for owner or team members (shared sets)
 
 ### 2. Test Case Management
 - Create detailed test cases with:
@@ -507,6 +538,8 @@ regression-test-management-platform/
 - Step-by-step execution interface
 - Real-time progress tracking
 - Update test case status (Pass, Fail, Skip) with actual results
+- Team members can execute and manage runs for shared sets
+- Bulk mark remaining run items in one action
 - Cancel running tests
 - View execution history with filters
 
@@ -520,6 +553,7 @@ regression-test-management-platform/
 
 ### 5. User Experience
 - **Responsive Design**: Works seamlessly on desktop, tablet, and mobile
+- **Profile Menu**: Avatar dropdown with user info, settings shortcut, theme switch, and logout
 - **Dark Mode**: Toggle between light and dark themes
 - **Modal Forms**: Clean modal-based forms for create/edit operations
 - **Loading States**: Visual feedback during API calls
@@ -532,7 +566,7 @@ regression-test-management-platform/
 - JWT tokens with 7-day expiration
 - Password hashing with bcrypt (10 salt rounds)
 - Protected routes with middleware validation
-- Resource ownership checks (users can only access their own data)
+- Resource access checks (owner or authorized team member for shared resources)
 
 ### API Security
 - Rate limiting on authentication endpoints

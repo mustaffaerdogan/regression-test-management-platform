@@ -1,7 +1,9 @@
 import { Request, Response, NextFunction } from 'express';
+import { Types } from 'mongoose';
 import RegressionSet, { IRegressionSet } from '../models/RegressionSet.model';
 import TestCase from '../models/TestCase.model';
 import { ApiError } from '../middleware/error.middleware';
+import { canAccessRegressionSet, getMyTeamIds, isTeamMember } from '../utils/authorization';
 
 interface AuthedRequest extends Request {
   user?: {
@@ -9,8 +11,21 @@ interface AuthedRequest extends Request {
   };
 }
 
-const ensureOwner = (regressionSet: IRegressionSet, req: AuthedRequest, message: string): boolean => {
-  if (!req.user || regressionSet.createdBy.toString() !== req.user.id) {
+const ensureAccess = async (
+  regressionSet: IRegressionSet,
+  req: AuthedRequest,
+  message: string,
+): Promise<boolean> => {
+  if (!req.user) {
+    (req.res as Response).status(401).json({
+      success: false,
+      message: 'User not authenticated',
+    });
+    return false;
+  }
+
+  const allowed = await canAccessRegressionSet(regressionSet, req.user.id);
+  if (!allowed) {
     // As explicitly required by spec, return 403 here instead of throwing
     (req.res as Response).status(403).json({
       success: false,
@@ -33,13 +48,24 @@ export const createRegressionSet = async (
       throw error;
     }
 
-    const { name, description, platform } = req.body;
+    const { name, description, platform, teamId } = req.body;
+
+    let teamObjectId: Types.ObjectId | undefined;
+    if (typeof teamId === 'string' && teamId.trim().length > 0) {
+      const member = await isTeamMember(teamId, req.user.id);
+      if (!member) {
+        res.status(403).json({ success: false, message: 'Unauthorized' });
+        return;
+      }
+      teamObjectId = new Types.ObjectId(teamId);
+    }
 
     const regressionSet = await RegressionSet.create({
       name,
       description,
       platform,
       createdBy: req.user.id,
+      ...(teamObjectId ? { team: teamObjectId } : {}),
     });
 
     res.status(201).json({
@@ -64,11 +90,24 @@ export const getRegressionSets = async (
       throw error;
     }
 
-    const { platform, search } = req.query;
+    const { platform, search, teamId } = req.query;
 
-    const filter: Record<string, unknown> = {
-      createdBy: req.user.id,
-    };
+    const filter: Record<string, unknown> = {};
+
+    if (typeof teamId === 'string' && teamId.trim().length > 0) {
+      const member = await isTeamMember(teamId, req.user.id);
+      if (!member) {
+        res.status(403).json({ success: false, message: 'Unauthorized' });
+        return;
+      }
+      filter.team = new Types.ObjectId(teamId);
+    } else {
+      const myTeamIds = await getMyTeamIds(req.user.id);
+      filter.$or = [
+        { createdBy: new Types.ObjectId(req.user.id) },
+        ...(myTeamIds.length > 0 ? [{ team: { $in: myTeamIds } }] : []),
+      ];
+    }
 
     if (typeof platform === 'string' && platform.length > 0) {
       filter.platform = platform;
@@ -76,7 +115,14 @@ export const getRegressionSets = async (
 
     if (typeof search === 'string' && search.trim().length > 0) {
       const regex = new RegExp(search.trim(), 'i');
-      filter.$or = [{ name: regex }, { description: regex }];
+      const searchOr = [{ name: regex }, { description: regex }];
+      if (Array.isArray(filter.$or)) {
+        // Combine existing $or (scope) with $and(search $or)
+        filter.$and = [{ $or: filter.$or }, { $or: searchOr }];
+        delete filter.$or;
+      } else {
+        filter.$or = searchOr;
+      }
     }
 
     const regressionSets = await RegressionSet.find(filter).sort({ createdAt: -1 });
@@ -113,7 +159,7 @@ export const getRegressionSetById = async (
       throw error;
     }
 
-    if (!ensureOwner(regressionSet, req, 'Unauthorized')) {
+    if (!(await ensureAccess(regressionSet, req, 'Unauthorized'))) {
       return;
     }
 
@@ -150,7 +196,7 @@ export const updateRegressionSet = async (
       throw error;
     }
 
-    if (!ensureOwner(regressionSet, req, 'Unauthorized')) {
+    if (!(await ensureAccess(regressionSet, req, 'Unauthorized'))) {
       return;
     }
 
@@ -200,7 +246,7 @@ export const deleteRegressionSet = async (
       throw error;
     }
 
-    if (!ensureOwner(regressionSet, req, 'Unauthorized')) {
+    if (!(await ensureAccess(regressionSet, req, 'Unauthorized'))) {
       return;
     }
 

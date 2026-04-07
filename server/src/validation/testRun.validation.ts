@@ -20,6 +20,15 @@ export const cancelRunValidation = [
   param('runId').isMongoId().withMessage('Invalid run id'),
 ];
 
+export const bulkUpdateRunValidation = [
+  param('runId').isMongoId().withMessage('Invalid run id'),
+  body('status')
+    .notEmpty()
+    .withMessage('Status is required')
+    .isIn(['Pass', 'Fail', 'Skipped'])
+    .withMessage('Status must be one of Pass, Fail, Skipped'),
+];
+
 export const historyQueryValidation = [
   query('page').optional().isInt({ min: 1 }).withMessage('page must be a positive integer'),
   query('limit').optional().isInt({ min: 1, max: 100 }).withMessage('limit must be between 1 and 100'),

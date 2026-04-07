@@ -5,6 +5,7 @@ import TestCase from '../models/TestCase.model';
 import Run, { IRun } from '../models/Run';
 import RunItem, { IRunItem } from '../models/RunItem';
 import { ApiError } from '../middleware/error.middleware';
+import { canAccessRegressionSet, getMyTeamIds } from '../utils/authorization';
 
 interface AuthedRequest extends Request {
   user?: {
@@ -12,8 +13,24 @@ interface AuthedRequest extends Request {
   };
 }
 
-const ensureRunOwner = (run: IRun, req: AuthedRequest): boolean => {
-  if (!req.user || run.startedBy.toString() !== req.user.id) {
+const ensureRunAccess = async (run: IRun, req: AuthedRequest): Promise<boolean> => {
+  if (!req.user) {
+    (req.res as Response).status(401).json({
+      success: false,
+      message: 'User not authenticated',
+    });
+    return false;
+  }
+
+  const regressionSet = await RegressionSet.findById(run.regressionSet);
+  if (!regressionSet) {
+    const error: ApiError = new Error('Regression set not found');
+    error.statusCode = 404;
+    throw error;
+  }
+
+  const allowed = await canAccessRegressionSet(regressionSet as any, req.user.id);
+  if (!allowed) {
     (req.res as Response).status(403).json({
       success: false,
       message: 'Unauthorized',
@@ -45,7 +62,8 @@ export const startRun = async (
       throw error;
     }
 
-    if (regressionSet.createdBy.toString() !== req.user.id) {
+    const allowed = await canAccessRegressionSet(regressionSet as any, req.user.id);
+    if (!allowed) {
       res.status(403).json({
         success: false,
         message: 'Unauthorized',
@@ -120,7 +138,14 @@ export const getRun = async (
       throw error;
     }
 
-    if (run.startedBy && (run.startedBy as any)._id?.toString() !== req.user.id) {
+    const regressionSet = await RegressionSet.findById((run as any).regressionSet?._id ?? run.regressionSet);
+    if (!regressionSet) {
+      const error: ApiError = new Error('Regression set not found');
+      error.statusCode = 404;
+      throw error;
+    }
+    const allowed = await canAccessRegressionSet(regressionSet as any, req.user.id);
+    if (!allowed) {
       res.status(403).json({
         success: false,
         message: 'Unauthorized',
@@ -169,7 +194,7 @@ export const getNextRunItem = async (
       throw error;
     }
 
-    if (!ensureRunOwner(run, req)) {
+    if (!(await ensureRunAccess(run, req))) {
       return;
     }
 
@@ -239,7 +264,7 @@ export const updateRunItem = async (
       throw error;
     }
 
-    if (!ensureRunOwner(run, req)) {
+    if (!(await ensureRunAccess(run, req))) {
       return;
     }
 
@@ -351,7 +376,7 @@ export const cancelRun = async (
       throw error;
     }
 
-    if (!ensureRunOwner(run, req)) {
+    if (!(await ensureRunAccess(run, req))) {
       return;
     }
 
@@ -390,41 +415,43 @@ export const listRunsHistory = async (
       status?: 'In Progress' | 'Completed' | 'Cancelled';
     };
 
-    const runFilter: Record<string, unknown> = {
-      startedBy: new Types.ObjectId(req.user.id),
+    const myTeamIds = await getMyTeamIds(req.user.id);
+    const accessibleSetFilter: Record<string, unknown> = {
+      $or: [
+        { createdBy: new Types.ObjectId(req.user.id) },
+        ...(myTeamIds.length > 0 ? [{ team: { $in: myTeamIds } }] : []),
+      ],
     };
 
     if (status) {
-      runFilter.status = status;
+      // status is applied to runs query later
     }
 
     if (platform) {
-      const sets = await RegressionSet.find({
-        createdBy: new Types.ObjectId(req.user.id),
-        platform,
-      })
-        .select('_id')
-        .lean()
-        .exec();
-
-      const ids = sets.map((s) => s._id);
-
-      if (ids.length === 0) {
-        res.status(200).json({
-          success: true,
-          message: 'Runs history fetched',
-          data: [],
-          pagination: {
-            page,
-            limit,
-            total: 0,
-          },
-        });
-        return;
-      }
-
-      runFilter.regressionSet = { $in: ids };
+      accessibleSetFilter.platform = platform;
     }
+
+    const sets = await RegressionSet.find(accessibleSetFilter).select('_id').lean().exec();
+    const ids = sets.map((s) => s._id);
+
+    if (ids.length === 0) {
+      res.status(200).json({
+        success: true,
+        message: 'Runs history fetched',
+        data: [],
+        pagination: {
+          page,
+          limit,
+          total: 0,
+        },
+      });
+      return;
+    }
+
+    const runFilter: Record<string, unknown> = {
+      regressionSet: { $in: ids },
+      ...(status ? { status } : {}),
+    };
 
     const [runs, total] = await Promise.all([
       Run.find(runFilter)
@@ -446,6 +473,77 @@ export const listRunsHistory = async (
         limit,
         total,
       },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const bulkUpdateRunItems = async (
+  req: AuthedRequest,
+  res: Response,
+  next: NextFunction,
+): Promise<void> => {
+  try {
+    if (!req.user) {
+      const error: ApiError = new Error('User not authenticated');
+      error.statusCode = 401;
+      throw error;
+    }
+
+    const { runId } = req.params;
+    const { status } = req.body as { status: 'Pass' | 'Fail' | 'Skipped' };
+
+    const run = await Run.findById(runId);
+    if (!run) {
+      const error: ApiError = new Error('Run not found');
+      error.statusCode = 404;
+      throw error;
+    }
+
+    if (!(await ensureRunAccess(run, req))) {
+      return;
+    }
+
+    if (run.status !== 'In Progress') {
+      const error: ApiError = new Error('Only in-progress runs can be bulk updated');
+      error.statusCode = 400;
+      throw error;
+    }
+
+    const now = new Date();
+    const pendingItems = await RunItem.find({ run: run._id, status: 'Not Executed' }).select('_id').lean();
+    const pendingCount = pendingItems.length;
+
+    if (pendingCount === 0) {
+      res.status(200).json({
+        success: true,
+        message: 'No pending items to update',
+        data: run,
+      });
+      return;
+    }
+
+    await RunItem.updateMany(
+      { run: run._id, status: 'Not Executed' },
+      { $set: { status, startedAt: now, completedAt: now } },
+    );
+
+    const incObj: { passed?: number; failed?: number; skipped?: number } = {};
+    if (status === 'Pass') incObj.passed = pendingCount;
+    if (status === 'Fail') incObj.failed = pendingCount;
+    if (status === 'Skipped') incObj.skipped = pendingCount;
+
+    const updatedRun = await Run.findByIdAndUpdate(
+      run._id,
+      { $inc: incObj, $set: { status: 'Completed', completedAt: now } },
+      { new: true },
+    );
+
+    res.status(200).json({
+      success: true,
+      message: `Updated ${pendingCount} items as ${status}`,
+      data: updatedRun,
     });
   } catch (error) {
     next(error);

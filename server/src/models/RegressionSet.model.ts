@@ -7,6 +7,7 @@ export interface IRegressionSet extends Document {
   description?: string;
   platform: Platform;
   createdBy: Types.ObjectId;
+  team?: Types.ObjectId;
   testCases: Types.ObjectId[];
   createdAt: Date;
   updatedAt: Date;
@@ -32,6 +33,12 @@ const regressionSetSchema = new Schema<IRegressionSet>(
       type: Schema.Types.ObjectId,
       ref: 'User',
       required: true,
+    },
+    team: {
+      type: Schema.Types.ObjectId,
+      ref: 'Team',
+      required: false,
+      index: true,
     },
     testCases: [
       {

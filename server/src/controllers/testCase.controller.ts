@@ -3,6 +3,7 @@ import { Types } from 'mongoose';
 import RegressionSet from '../models/RegressionSet.model';
 import TestCase, { ITestCase } from '../models/TestCase.model';
 import { ApiError } from '../middleware/error.middleware';
+import { canAccessRegressionSet } from '../utils/authorization';
 
 interface AuthedRequest extends Request {
   user?: {
@@ -10,7 +11,7 @@ interface AuthedRequest extends Request {
   };
 }
 
-const ensureOwnerByRegressionSetId = async (
+const ensureAccessByRegressionSetId = async (
   regressionSetId: string,
   req: AuthedRequest,
 ): Promise<boolean> => {
@@ -22,7 +23,16 @@ const ensureOwnerByRegressionSetId = async (
     throw error;
   }
 
-  if (!req.user || regressionSet.createdBy.toString() !== req.user.id) {
+  if (!req.user) {
+    (req.res as Response).status(401).json({
+      success: false,
+      message: 'User not authenticated',
+    });
+    return false;
+  }
+
+  const allowed = await canAccessRegressionSet(regressionSet as any, req.user.id);
+  if (!allowed) {
     (req.res as Response).status(403).json({
       success: false,
       message: 'Unauthorized',
@@ -34,7 +44,7 @@ const ensureOwnerByRegressionSetId = async (
   return true;
 };
 
-const ensureOwnerByTestCase = async (testCase: ITestCase, req: AuthedRequest): Promise<boolean> => {
+const ensureAccessByTestCase = async (testCase: ITestCase, req: AuthedRequest): Promise<boolean> => {
   const regressionSet = await RegressionSet.findById(testCase.regressionSet);
 
   if (!regressionSet) {
@@ -43,7 +53,16 @@ const ensureOwnerByTestCase = async (testCase: ITestCase, req: AuthedRequest): P
     throw error;
   }
 
-  if (!req.user || regressionSet.createdBy.toString() !== req.user.id) {
+  if (!req.user) {
+    (req.res as Response).status(401).json({
+      success: false,
+      message: 'User not authenticated',
+    });
+    return false;
+  }
+
+  const allowed = await canAccessRegressionSet(regressionSet as any, req.user.id);
+  if (!allowed) {
     (req.res as Response).status(403).json({
       success: false,
       message: 'Unauthorized',
@@ -70,8 +89,8 @@ export const createTestCase = async (
 
     const regressionSetId = id as string;
 
-    const isOwner = await ensureOwnerByRegressionSetId(regressionSetId, req);
-    if (!isOwner) {
+    const allowed = await ensureAccessByRegressionSetId(regressionSetId, req);
+    if (!allowed) {
       return;
     }
 
@@ -136,8 +155,8 @@ export const getTestCasesForRegressionSet = async (
     const { id } = req.params; // regression set id
     const regressionSetId = id as string;
 
-    const isOwner = await ensureOwnerByRegressionSetId(regressionSetId, req);
-    if (!isOwner) {
+    const allowed = await ensureAccessByRegressionSetId(regressionSetId, req);
+    if (!allowed) {
       return;
     }
 
@@ -177,8 +196,8 @@ export const getTestCaseById = async (
       throw error;
     }
 
-    const isOwner = await ensureOwnerByTestCase(testCase, req);
-    if (!isOwner) {
+    const allowed = await ensureAccessByTestCase(testCase, req);
+    if (!allowed) {
       return;
     }
 
@@ -214,8 +233,8 @@ export const updateTestCase = async (
       throw error;
     }
 
-    const isOwner = await ensureOwnerByTestCase(testCase, req);
-    if (!isOwner) {
+    const allowed = await ensureAccessByTestCase(testCase, req);
+    if (!allowed) {
       return;
     }
 
@@ -255,8 +274,8 @@ export const deleteTestCase = async (
       throw error;
     }
 
-    const isOwner = await ensureOwnerByTestCase(testCase, req);
-    if (!isOwner) {
+    const allowed = await ensureAccessByTestCase(testCase, req);
+    if (!allowed) {
       return;
     }
 

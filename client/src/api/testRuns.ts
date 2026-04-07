@@ -103,6 +103,19 @@ export const cancelRun = async (runId: string): Promise<ApiResponse<Run>> => {
   return handleResponse<Run>(response);
 };
 
+export const bulkUpdateRunItems = async (
+  runId: string,
+  status: 'Pass' | 'Fail' | 'Skipped',
+): Promise<ApiResponse<Run>> => {
+  const response = await fetch(`${API_BASE_URL}/test-runs/${runId}/bulk-update`, {
+    method: 'PUT',
+    headers: getAuthHeaders(),
+    body: JSON.stringify({ status }),
+  });
+
+  return handleResponse<Run>(response);
+};
+
 export const getRunHistory = async (
   params: RunHistoryQuery = {},
 ): Promise<ApiResponse<{ runs: Run[]; pagination: { page: number; limit: number; total: number } }>> => {

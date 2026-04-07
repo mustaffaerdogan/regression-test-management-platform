@@ -5,14 +5,17 @@ import type { RegressionSet } from '../../types/regression';
 import { RegressionSetCard } from '../../components/RegressionSetCard';
 import { RegressionSetFormModal } from '../../components/RegressionSetFormModal';
 import { Button } from '../../components/Button';
+import { useTeams } from '../../context/TeamContext';
 
 export const RegressionSetListPage = () => {
   const navigate = useNavigate();
+  const { teams } = useTeams();
   const [items, setItems] = useState<RegressionSet[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [platform, setPlatform] = useState('');
+  const [teamId, setTeamId] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingSet, setEditingSet] = useState<RegressionSet | undefined>(undefined);
 
@@ -20,7 +23,7 @@ export const RegressionSetListPage = () => {
     setLoading(true);
     setError(null);
     try {
-      const response = await getRegressionSets({ search, platform });
+      const response = await getRegressionSets({ search, platform, teamId: teamId || undefined });
       setItems(response.data ?? []);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load regression sets');
@@ -99,6 +102,18 @@ export const RegressionSetListPage = () => {
           <option value="Android">Android</option>
           <option value="TV">TV</option>
         </select>
+        <select
+          value={teamId}
+          onChange={(e) => setTeamId(e.target.value)}
+          className="w-full md:w-56 rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+        >
+          <option value="">All (mine + my teams)</option>
+          {teams.map((team) => (
+            <option key={team._id} value={team._id}>
+              {team.name}
+            </option>
+          ))}
+        </select>
         <Button type="button" variant="secondary" onClick={handleApplyFilters} className="px-4 py-2">
           Apply
         </Button>
@@ -143,6 +158,8 @@ export const RegressionSetListPage = () => {
           void fetchData();
         }}
         initialValues={editingSet}
+        teams={teams}
+        defaultTeamId={teamId}
       />
     </div>
   );

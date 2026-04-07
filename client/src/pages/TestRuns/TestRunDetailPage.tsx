@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Navigate, useNavigate, useParams } from 'react-router-dom';
-import { getRunById } from '../../api/testRuns';
+import { bulkUpdateRunItems, getRunById } from '../../api/testRuns';
 import type { Run, RunItem } from '../../types/testRun';
 import { RunSummaryCard } from './components/RunSummaryCard';
 import { RunStatusBadge } from './components/RunStatusBadge';
@@ -16,6 +16,22 @@ export const TestRunDetailPage = () => {
   const [items, setItems] = useState<RunItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [bulkLoading, setBulkLoading] = useState(false);
+  const handleBulkMark = async (status: 'Pass' | 'Fail' | 'Skipped') => {
+    if (!runId || !run) return;
+    if (!window.confirm(`Mark all remaining test cases as ${status}?`)) return;
+    setBulkLoading(true);
+    setError(null);
+    try {
+      await bulkUpdateRunItems(runId, status);
+      await fetchData();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to bulk update run items');
+    } finally {
+      setBulkLoading(false);
+    }
+  };
+
 
   const fetchData = async () => {
     if (!runId) return;
@@ -103,13 +119,48 @@ export const TestRunDetailPage = () => {
           )}
         </div>
         {run.status === 'In Progress' && (
-          <Button
-            type="button"
-            className="px-4 py-2 rounded-full"
-            onClick={() => navigate(`/test-runs/${run._id}/execute`)}
-          >
-            Continue Execution
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              type="button"
+              className="px-4 py-2 rounded-full"
+              onClick={() => navigate(`/test-runs/${run._id}/execute`)}
+            >
+              Continue Execution
+            </Button>
+            <Button
+              type="button"
+              variant="secondary"
+              className="px-3 py-2"
+              onClick={() => {
+                void handleBulkMark('Pass');
+              }}
+              disabled={bulkLoading}
+            >
+              Mark Remaining Pass
+            </Button>
+            <Button
+              type="button"
+              variant="secondary"
+              className="px-3 py-2"
+              onClick={() => {
+                void handleBulkMark('Fail');
+              }}
+              disabled={bulkLoading}
+            >
+              Mark Remaining Fail
+            </Button>
+            <Button
+              type="button"
+              variant="secondary"
+              className="px-3 py-2"
+              onClick={() => {
+                void handleBulkMark('Skipped');
+              }}
+              disabled={bulkLoading}
+            >
+              Mark Remaining Skipped
+            </Button>
+          </div>
         )}
       </div>
 

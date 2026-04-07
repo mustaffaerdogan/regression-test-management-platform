@@ -25,6 +25,7 @@ export interface RegressionSet {
   name: string;
   description?: string;
   platform: RegressionPlatform;
+  team?: string;
   createdAt: string;
   updatedAt?: string;
   testCases?: TestCase[];
@@ -45,6 +46,7 @@ export interface CreateRegressionSetPayload {
   name: string;
   description?: string;
   platform: RegressionPlatform;
+  teamId?: string;
 }
 
 export type UpdateRegressionSetPayload = Partial<CreateRegressionSetPayload>;
@@ -69,6 +71,7 @@ export type UpdateTestCasePayload = Partial<CreateTestCasePayload>;
 export interface RegressionSetQueryParams {
   search?: string;
   platform?: string;
+  teamId?: string;
   page?: number;
   limit?: number;
 }

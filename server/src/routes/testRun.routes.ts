@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { authMiddleware } from '../middleware/auth.middleware';
 import { validate } from '../middleware/validate.middleware';
 import {
+  bulkUpdateRunItems,
   cancelRun,
   getNextRunItem,
   getRun,
@@ -10,6 +11,7 @@ import {
   updateRunItem,
 } from '../controllers/testRun.controller';
 import {
+  bulkUpdateRunValidation,
   cancelRunValidation,
   historyQueryValidation,
   runIdParamValidation,
@@ -25,6 +27,7 @@ router.use(authMiddleware);
 // IMPORTANT: define static routes before dynamic :runId routes to avoid conflicts
 router.get('/history', validate(historyQueryValidation), listRunsHistory);
 router.post('/start/:regressionSetId', validate(startRunValidation), startRun);
+router.put('/:runId/bulk-update', validate(bulkUpdateRunValidation), bulkUpdateRunItems);
 router.get('/:runId', validate(runIdParamValidation), getRun);
 router.get('/:runId/next', validate(runIdParamValidation), getNextRunItem);
 router.put('/update-item/:itemId', validate(updateRunItemValidation), updateRunItem);

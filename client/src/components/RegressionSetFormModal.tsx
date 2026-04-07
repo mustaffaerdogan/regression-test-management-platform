@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { RegressionPlatform, RegressionSet, CreateRegressionSetPayload } from '../types/regression';
+import type { Team } from '../types/team';
 import { createRegressionSet, updateRegressionSet } from '../api/regressionSets';
 import { Button } from './Button';
 
@@ -8,6 +9,8 @@ interface RegressionSetFormModalProps {
   onClose: () => void;
   onSuccess: () => void;
   initialValues?: RegressionSet;
+  teams?: Team[];
+  defaultTeamId?: string;
 }
 
 const PLATFORMS: RegressionPlatform[] = ['Web', 'iOS', 'Android', 'TV'];
@@ -17,10 +20,13 @@ export const RegressionSetFormModal = ({
   onClose,
   onSuccess,
   initialValues,
+  teams = [],
+  defaultTeamId,
 }: RegressionSetFormModalProps) => {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [platform, setPlatform] = useState<RegressionPlatform>('Web');
+  const [teamId, setTeamId] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -29,13 +35,15 @@ export const RegressionSetFormModal = ({
       setName(initialValues.name ?? '');
       setDescription(initialValues.description ?? '');
       setPlatform(initialValues.platform);
+      setTeamId(initialValues.team ?? '');
     } else {
       setName('');
       setDescription('');
       setPlatform('Web');
+      setTeamId(defaultTeamId ?? '');
     }
     setError(null);
-  }, [initialValues, isOpen]);
+  }, [initialValues, isOpen, defaultTeamId]);
 
   if (!isOpen) return null;
 
@@ -52,6 +60,7 @@ export const RegressionSetFormModal = ({
       name: name.trim(),
       description: description.trim() || undefined,
       platform,
+      teamId: teamId || undefined,
     };
 
     setLoading(true);
@@ -126,6 +135,26 @@ export const RegressionSetFormModal = ({
               ))}
             </select>
           </div>
+
+          {!initialValues && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Visibility
+              </label>
+              <select
+                value={teamId}
+                onChange={(e) => setTeamId(e.target.value)}
+                className="w-full rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              >
+                <option value="">Personal (only me)</option>
+                {teams.map((team) => (
+                  <option key={team._id} value={team._id}>
+                    Team: {team.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
 
           <div className="mt-6 flex justify-end gap-3">
             <Button
