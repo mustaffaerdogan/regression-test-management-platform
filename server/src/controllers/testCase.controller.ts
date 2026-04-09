@@ -3,7 +3,7 @@ import { Types } from 'mongoose';
 import RegressionSet from '../models/RegressionSet.model';
 import TestCase, { ITestCase } from '../models/TestCase.model';
 import { ApiError } from '../middleware/error.middleware';
-import { canAccessRegressionSet } from '../utils/authorization';
+import { canAccessRegressionSet, canEditRegressionSet } from '../utils/authorization';
 
 interface AuthedRequest extends Request {
   user?: {
@@ -32,6 +32,39 @@ const ensureAccessByRegressionSetId = async (
   }
 
   const allowed = await canAccessRegressionSet(regressionSet as any, req.user.id);
+  if (!allowed) {
+    (req.res as Response).status(403).json({
+      success: false,
+      message: 'Unauthorized',
+    });
+    return false;
+  }
+
+  (req as any).regressionSet = regressionSet;
+  return true;
+};
+
+const ensureEditAccessByRegressionSetId = async (
+  regressionSetId: string,
+  req: AuthedRequest,
+): Promise<boolean> => {
+  const regressionSet = await RegressionSet.findById(regressionSetId);
+
+  if (!regressionSet) {
+    const error: ApiError = new Error('Regression set not found');
+    error.statusCode = 404;
+    throw error;
+  }
+
+  if (!req.user) {
+    (req.res as Response).status(401).json({
+      success: false,
+      message: 'User not authenticated',
+    });
+    return false;
+  }
+
+  const allowed = await canEditRegressionSet(regressionSet as any, req.user.id);
   if (!allowed) {
     (req.res as Response).status(403).json({
       success: false,
@@ -73,6 +106,35 @@ const ensureAccessByTestCase = async (testCase: ITestCase, req: AuthedRequest): 
   return true;
 };
 
+const ensureEditAccessByTestCase = async (testCase: ITestCase, req: AuthedRequest): Promise<boolean> => {
+  const regressionSet = await RegressionSet.findById(testCase.regressionSet);
+
+  if (!regressionSet) {
+    const error: ApiError = new Error('Regression set not found');
+    error.statusCode = 404;
+    throw error;
+  }
+
+  if (!req.user) {
+    (req.res as Response).status(401).json({
+      success: false,
+      message: 'User not authenticated',
+    });
+    return false;
+  }
+
+  const allowed = await canEditRegressionSet(regressionSet as any, req.user.id);
+  if (!allowed) {
+    (req.res as Response).status(403).json({
+      success: false,
+      message: 'Unauthorized',
+    });
+    return false;
+  }
+
+  return true;
+};
+
 export const createTestCase = async (
   req: AuthedRequest,
   res: Response,
@@ -89,7 +151,7 @@ export const createTestCase = async (
 
     const regressionSetId = id as string;
 
-    const allowed = await ensureAccessByRegressionSetId(regressionSetId, req);
+    const allowed = await ensureEditAccessByRegressionSetId(regressionSetId, req);
     if (!allowed) {
       return;
     }
@@ -233,7 +295,7 @@ export const updateTestCase = async (
       throw error;
     }
 
-    const allowed = await ensureAccessByTestCase(testCase, req);
+    const allowed = await ensureEditAccessByTestCase(testCase, req);
     if (!allowed) {
       return;
     }
@@ -274,7 +336,7 @@ export const deleteTestCase = async (
       throw error;
     }
 
-    const allowed = await ensureAccessByTestCase(testCase, req);
+    const allowed = await ensureEditAccessByTestCase(testCase, req);
     if (!allowed) {
       return;
     }

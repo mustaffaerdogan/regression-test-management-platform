@@ -68,3 +68,15 @@ export const fetchMe = async (): Promise<{ success: boolean; message: string; us
   return handleResponse<{ success: boolean; message: string; user: User }>(response);
 };
 
+export const updateProfile = async (
+  profileData: { name: string; password?: string },
+): Promise<{ success: boolean; message: string; user: User }> => {
+  const response = await fetch(`${API_BASE_URL}/auth/profile`, {
+    method: 'PUT',
+    headers: getAuthHeaders(),
+    body: JSON.stringify(profileData),
+  });
+
+  return handleResponse<{ success: boolean; message: string; user: User }>(response);
+};
+

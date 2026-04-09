@@ -121,7 +121,7 @@ export const ProtectedLayout = () => {
               <button
                 type="button"
                 onClick={() => {
-                  window.alert('Settings page will be added soon.');
+                  navigate('/settings');
                 }}
                 className="w-full text-left px-2 py-2 rounded-md text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800"
               >

@@ -3,7 +3,7 @@ import { Types } from 'mongoose';
 import RegressionSet, { IRegressionSet } from '../models/RegressionSet.model';
 import TestCase from '../models/TestCase.model';
 import { ApiError } from '../middleware/error.middleware';
-import { canAccessRegressionSet, getMyTeamIds, isTeamMember } from '../utils/authorization';
+import { canAccessRegressionSet, canEditRegressionSet, getMyTeamIds, isTeamMember } from '../utils/authorization';
 
 interface AuthedRequest extends Request {
   user?: {
@@ -27,6 +27,30 @@ const ensureAccess = async (
   const allowed = await canAccessRegressionSet(regressionSet, req.user.id);
   if (!allowed) {
     // As explicitly required by spec, return 403 here instead of throwing
+    (req.res as Response).status(403).json({
+      success: false,
+      message,
+    });
+    return false;
+  }
+  return true;
+};
+
+const ensureEditAccess = async (
+  regressionSet: IRegressionSet,
+  req: AuthedRequest,
+  message: string,
+): Promise<boolean> => {
+  if (!req.user) {
+    (req.res as Response).status(401).json({
+      success: false,
+      message: 'User not authenticated',
+    });
+    return false;
+  }
+
+  const allowed = await canEditRegressionSet(regressionSet, req.user.id);
+  if (!allowed) {
     (req.res as Response).status(403).json({
       success: false,
       message,
@@ -196,7 +220,7 @@ export const updateRegressionSet = async (
       throw error;
     }
 
-    if (!(await ensureAccess(regressionSet, req, 'Unauthorized'))) {
+    if (!(await ensureEditAccess(regressionSet, req, 'Unauthorized'))) {
       return;
     }
 
@@ -246,7 +270,7 @@ export const deleteRegressionSet = async (
       throw error;
     }
 
-    if (!(await ensureAccess(regressionSet, req, 'Unauthorized'))) {
+    if (!(await ensureEditAccess(regressionSet, req, 'Unauthorized'))) {
       return;
     }
 

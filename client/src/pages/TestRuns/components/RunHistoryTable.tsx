@@ -5,6 +5,7 @@ interface RunHistoryTableProps {
   runs: Run[];
   onView: (runId: string) => void;
   onExecute: (runId: string) => void;
+  onExport?: (runId: string) => void;
 }
 
 const shortId = (id: string): string => {
@@ -12,7 +13,7 @@ const shortId = (id: string): string => {
   return `${id.slice(0, 4)}...${id.slice(-4)}`;
 };
 
-export const RunHistoryTable = ({ runs, onView, onExecute }: RunHistoryTableProps) => {
+export const RunHistoryTable = ({ runs, onView, onExecute, onExport }: RunHistoryTableProps) => {
   if (runs.length === 0) {
     return (
       <p className="text-sm text-gray-600 dark:text-gray-400">
@@ -86,9 +87,18 @@ export const RunHistoryTable = ({ runs, onView, onExecute }: RunHistoryTableProp
                     <button
                       type="button"
                       onClick={() => onExecute(run._id)}
-                      className="text-sm text-green-600 dark:text-green-400 hover:underline"
+                      className="text-sm text-green-600 dark:text-green-400 hover:underline mr-3"
                     >
                       Execute
+                    </button>
+                  )}
+                  {onExport && (
+                    <button
+                      type="button"
+                      onClick={() => onExport(run._id)}
+                      className="text-sm text-blue-600 dark:text-blue-400 hover:underline"
+                    >
+                      Export
                     </button>
                   )}
                 </td>

@@ -9,6 +9,7 @@ import {
   listRunsHistory,
   startRun,
   updateRunItem,
+  exportRunToExcel,
 } from '../controllers/testRun.controller';
 import {
   bulkUpdateRunValidation,
@@ -30,6 +31,7 @@ router.post('/start/:regressionSetId', validate(startRunValidation), startRun);
 router.put('/:runId/bulk-update', validate(bulkUpdateRunValidation), bulkUpdateRunItems);
 router.get('/:runId', validate(runIdParamValidation), getRun);
 router.get('/:runId/next', validate(runIdParamValidation), getNextRunItem);
+router.get('/:runId/export', validate(runIdParamValidation), exportRunToExcel);
 router.put('/update-item/:itemId', validate(updateRunItemValidation), updateRunItem);
 router.put('/cancel/:runId', validate(cancelRunValidation), cancelRun);
 

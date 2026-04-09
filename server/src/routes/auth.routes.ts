@@ -4,8 +4,10 @@ import {
   register,
   login,
   getMe,
+  updateProfile,
   registerValidations,
   loginValidations,
+  updateProfileValidations,
 } from '../controllers/auth.controller';
 import { validate } from '../middleware/validate.middleware';
 import { authMiddleware } from '../middleware/auth.middleware';
@@ -32,6 +34,7 @@ const authLimiter = rateLimit({
 router.post('/register', authLimiter, validate(registerValidations), register);
 router.post('/login', authLimiter, validate(loginValidations), login);
 router.get('/me', authMiddleware, getMe);
+router.put('/profile', authMiddleware, validate(updateProfileValidations), updateProfile);
 
 export default router;
 

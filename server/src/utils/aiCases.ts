@@ -45,6 +45,7 @@ const MAX_TEST_CASES_PER_REQUEST = 3;
 const SYSTEM_PROMPT = `
 You are a senior QA analyst.
 Return ONLY test cases in strict JSON.
+ALL text content inside the JSON MUST be in Turkish language (Türkçe).
 
 OUTPUT FORMAT (STRICT JSON ONLY, NO EXTRA KEYS)
 {
@@ -77,6 +78,7 @@ MANDATORY RULES
 
 const USER_PROMPT_TEMPLATE = (input: AICaseGenerationInput): string => `
 Generate only 3 test cases for this input.
+All generated content MUST be in Turkish.
 
 User story:
 ${input.userStory}
@@ -264,12 +266,12 @@ export const generateRegressionSetsFromText = async (
   };
 
   try {
-    const parsed = await requestAndParse(420);
+    const parsed = await requestAndParse(1000);
     return normalizeAIResult(parsed, MAX_TEST_CASES_PER_REQUEST);
   } catch (error) {
     // If provider returned cut/incomplete JSON, retry once with a slightly higher output budget.
     if (isLikelyJsonParseError(error)) {
-      const parsed = await requestAndParse(520);
+      const parsed = await requestAndParse(1500);
       return normalizeAIResult(parsed, MAX_TEST_CASES_PER_REQUEST);
     }
 

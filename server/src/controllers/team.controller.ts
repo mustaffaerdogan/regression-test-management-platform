@@ -19,11 +19,17 @@ export const createTeam = async (
 
     const { name, description } = req.body;
 
+    const existingTeam = await Team.findOne({ name });
+    if (existingTeam) {
+      res.status(400).json({ success: false, message: 'Bu takım mevcut' });
+      return;
+    }
+
     const team = new Team({
       name,
       description,
       owner: req.user.id,
-      members: [{ user: req.user.id, role: 'owner', joinedAt: new Date() }],
+      members: [{ user: req.user.id, role: 'admin', joinedAt: new Date() }],
       inviteCode: randomUUID(),
     });
     await team.save();
@@ -131,8 +137,9 @@ export const updateTeam = async (
       throw error;
     }
 
-    if (team.owner.toString() !== req.user.id) {
-      res.status(403).json({ success: false, message: 'Only the team owner can update the team' });
+    const isAdmin = team.owner.toString() === req.user!.id || team.members.some(m => m.user.toString() === req.user!.id && m.role === 'admin');
+    if (!isAdmin) {
+      res.status(403).json({ success: false, message: 'Only the team admin can update the team' });
       return;
     }
 
@@ -177,8 +184,9 @@ export const deleteTeam = async (
       throw error;
     }
 
-    if (team.owner.toString() !== req.user.id) {
-      res.status(403).json({ success: false, message: 'Only the team owner can delete the team' });
+    const isAdmin = team.owner.toString() === req.user!.id || team.members.some(m => m.user.toString() === req.user!.id && m.role === 'admin');
+    if (!isAdmin) {
+      res.status(403).json({ success: false, message: 'Only the team admin can delete the team' });
       return;
     }
 
@@ -214,12 +222,13 @@ export const inviteMember = async (
       throw error;
     }
 
-    if (team.owner.toString() !== req.user.id) {
-      res.status(403).json({ success: false, message: 'Only the team owner can invite members' });
+    const isAdmin = team.owner.toString() === req.user!.id || team.members.some(m => m.user.toString() === req.user!.id && m.role === 'admin');
+    if (!isAdmin) {
+      res.status(403).json({ success: false, message: 'Only the team admin can invite members' });
       return;
     }
 
-    const { email } = req.body;
+    const { email, role } = req.body;
     const invitedUser = await User.findOne({ email: (email as string).toLowerCase().trim() });
 
     if (!invitedUser) {
@@ -237,9 +246,12 @@ export const inviteMember = async (
       return;
     }
 
+    const validRoles = ['admin', 'qa_lead', 'tester', 'viewer'];
+    const assignedRole = validRoles.includes(role) ? role : 'viewer';
+
     team.members.push({
       user: invitedUser._id as ITeamMember['user'],
-      role: 'member',
+      role: assignedRole as 'admin' | 'qa_lead' | 'tester' | 'viewer',
       joinedAt: new Date(),
     });
 
@@ -290,7 +302,7 @@ export const joinTeam = async (
 
     team.members.push({
       user: req.user.id as unknown as ITeamMember['user'],
-      role: 'member',
+      role: 'viewer', // default to viewer
       joinedAt: new Date(),
     });
 
@@ -329,8 +341,9 @@ export const removeMember = async (
       throw error;
     }
 
-    if (team.owner.toString() !== req.user.id) {
-      res.status(403).json({ success: false, message: 'Only the team owner can remove members' });
+    const isAdmin = team.owner.toString() === req.user!.id || team.members.some(m => m.user.toString() === req.user!.id && m.role === 'admin');
+    if (!isAdmin) {
+      res.status(403).json({ success: false, message: 'Only the team admin can remove members' });
       return;
     }
 
@@ -386,7 +399,8 @@ export const leaveTeam = async (
       throw error;
     }
 
-    if (team.owner.toString() === req.user.id) {
+    const isOwner = team.owner.toString() === req.user.id;
+    if (isOwner) {
       res.status(400).json({
         success: false,
         message: 'Team owner cannot leave. Transfer ownership or delete the team.',
@@ -415,6 +429,69 @@ export const leaveTeam = async (
   }
 };
 
+// PUT /api/teams/:id/members/:userId/role
+export const updateMemberRole = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> => {
+  try {
+    if (!req.user) {
+      const error: ApiError = new Error('User not authenticated');
+      error.statusCode = 401;
+      throw error;
+    }
+
+    const team = await Team.findById(req.params.id);
+
+    if (!team) {
+      const error: ApiError = new Error('Team not found');
+      error.statusCode = 404;
+      throw error;
+    }
+
+    const isAdmin = team.owner.toString() === req.user!.id || team.members.some(m => m.user.toString() === req.user!.id && m.role === 'admin');
+    if (!isAdmin) {
+      res.status(403).json({ success: false, message: 'Only the team admin can update member roles' });
+      return;
+    }
+
+    const { userId } = req.params;
+    const { role } = req.body;
+
+    if (userId === team.owner.toString()) {
+      res.status(400).json({ success: false, message: 'Cannot change the team owner role' });
+      return;
+    }
+
+    const memberIndex = team.members.findIndex(
+      (m: ITeamMember) => m.user.toString() === userId,
+    );
+    if (memberIndex === -1) {
+      const error: ApiError = new Error('Member not found in team');
+      error.statusCode = 404;
+      throw error;
+    }
+
+    const member = team.members[memberIndex];
+    if (member) {
+      member.role = role as any;
+    }
+    await team.save();
+
+    await team.populate('owner', 'name email');
+    await team.populate('members.user', 'name email');
+
+    res.status(200).json({
+      success: true,
+      message: 'Member role updated successfully',
+      data: team,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 // POST /api/teams/:id/regenerate-invite  (davet kodunu yenile)
 export const regenerateInviteCode = async (
   req: Request,
@@ -436,10 +513,11 @@ export const regenerateInviteCode = async (
       throw error;
     }
 
-    if (team.owner.toString() !== req.user.id) {
+    const isAdmin = team.owner.toString() === req.user!.id || team.members.some(m => m.user.toString() === req.user!.id && m.role === 'admin');
+    if (!isAdmin) {
       res.status(403).json({
         success: false,
-        message: 'Only the team owner can regenerate the invite code',
+        message: 'Only the team admin can regenerate the invite code',
       });
       return;
     }

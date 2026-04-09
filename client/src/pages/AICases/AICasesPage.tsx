@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '../../components/Button';
-import { generateAICases } from '../../api/aiCases';
+import { generateAICases, extractJiraDataFromApi } from '../../api/aiCases';
 import type { AIRegressionSetSuggestion } from '../../types/aiCases';
 import type { RegressionPlatform } from '../../types/regression';
 import { createRegressionSet, createTestCase } from '../../api/regressionSets';
@@ -20,6 +20,11 @@ export const AICasesPage = () => {
   const [criteriaText, setCriteriaText] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  
+  const [jiraUrl, setJiraUrl] = useState('');
+  const [extractingJira, setExtractingJira] = useState(false);
+  const [pendingJiraData, setPendingJiraData] = useState<{ userStory: string, acceptanceCriteria: string[] } | null>(null);
+
   const [results, setResults] = useState<AIRegressionSetSuggestion[]>([]);
   const [accepted, setAccepted] = useState(false);
   const [selectedCaseIds, setSelectedCaseIds] = useState<string[]>([]);
@@ -71,6 +76,36 @@ export const AICasesPage = () => {
       setError(err instanceof Error ? err.message : 'Failed to generate AI cases');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleJiraExtract = async () => {
+    if (!jiraUrl.trim()) {
+      setError('Lütfen bir Jira linki girin.');
+      return;
+    }
+    setExtractingJira(true);
+    setError(null);
+    try {
+      const resp = await extractJiraDataFromApi(jiraUrl.trim());
+      setPendingJiraData(resp.data ?? null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Jira\'dan veri çekilemedi.');
+    } finally {
+      setExtractingJira(false);
+    }
+  };
+
+  const confirmJiraData = () => {
+    if (pendingJiraData) {
+      if (pendingJiraData.userStory) {
+        setUserStory(pendingJiraData.userStory);
+      }
+      if (pendingJiraData.acceptanceCriteria && pendingJiraData.acceptanceCriteria.length > 0) {
+        setCriteriaText(pendingJiraData.acceptanceCriteria.join('\n'));
+      }
+      setPendingJiraData(null);
+      setJiraUrl('');
     }
   };
 
@@ -156,6 +191,59 @@ export const AICasesPage = () => {
         onSubmit={handleGenerate}
         className="rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-4 space-y-4"
       >
+        <div className="border border-indigo-100 dark:border-indigo-900/50 bg-indigo-50/50 dark:bg-indigo-900/10 p-4 rounded-lg space-y-3 mb-6">
+          <h2 className="text-sm font-semibold text-indigo-900 dark:text-indigo-300">
+            Jira Linki ile Otomatik Doldur
+          </h2>
+          <div className="flex flex-col sm:flex-row gap-3">
+            <input
+              type="text"
+              value={jiraUrl}
+              onChange={(e) => setJiraUrl(e.target.value)}
+              placeholder="https://yourdomain.atlassian.net/browse/PROJ-123"
+              className="flex-1 rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            />
+            <Button
+              type="button"
+              variant="secondary"
+              loading={extractingJira}
+              onClick={handleJiraExtract}
+            >
+              Jira'dan Çek
+            </Button>
+          </div>
+          
+          {pendingJiraData && (
+            <div className="mt-4 p-4 border border-blue-200 dark:border-blue-800 bg-white dark:bg-gray-800 rounded-md">
+              <h3 className="text-sm font-semibold mb-2 text-gray-900 dark:text-white">Çekilen Verileri Onaylıyor musunuz?</h3>
+              <div className="space-y-3 text-sm text-gray-700 dark:text-gray-300">
+                <div>
+                  <strong className="block text-gray-900 dark:text-white">User Story:</strong>
+                  <p className="mt-1 bg-gray-50 dark:bg-gray-900 p-2 rounded">{pendingJiraData.userStory || <span className="text-gray-400 italic">Bulunamadı</span>}</p>
+                </div>
+                <div>
+                  <strong className="block text-gray-900 dark:text-white">Acceptance Criteria:</strong>
+                  {pendingJiraData.acceptanceCriteria && pendingJiraData.acceptanceCriteria.length > 0 ? (
+                    <ul className="list-disc list-inside mt-1 bg-gray-50 dark:bg-gray-900 p-2 rounded">
+                      {pendingJiraData.acceptanceCriteria.map((c, i) => <li key={i}>{c}</li>)}
+                    </ul>
+                  ) : (
+                    <p className="mt-1 bg-gray-50 dark:bg-gray-900 p-2 rounded"><span className="text-gray-400 italic">Bulunamadı</span></p>
+                  )}
+                </div>
+              </div>
+              <div className="flex gap-2 mt-4 justify-end">
+                <Button type="button" variant="secondary" onClick={() => setPendingJiraData(null)}>
+                  İptal
+                </Button>
+                <Button type="button" variant="primary" onClick={confirmJiraData}>
+                  Onayla ve Forma Aktar
+                </Button>
+              </div>
+            </div>
+          )}
+        </div>
+
         <div>
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
             User Story

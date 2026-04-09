@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Navigate, useNavigate, useParams } from 'react-router-dom';
-import { bulkUpdateRunItems, getRunById } from '../../api/testRuns';
+import { bulkUpdateRunItems, getRunById, exportRunToExcel } from '../../api/testRuns';
 import type { Run, RunItem } from '../../types/testRun';
 import { RunSummaryCard } from './components/RunSummaryCard';
 import { RunStatusBadge } from './components/RunStatusBadge';
@@ -29,6 +29,15 @@ export const TestRunDetailPage = () => {
       setError(err instanceof Error ? err.message : 'Failed to bulk update run items');
     } finally {
       setBulkLoading(false);
+    }
+  };
+
+  const handleExport = async () => {
+    if (!runId) return;
+    try {
+      await exportRunToExcel(runId);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to export test run. Ensure you have the proper permissions.');
     }
   };
 
@@ -117,6 +126,14 @@ export const TestRunDetailPage = () => {
               Regression Set: {regressionSet.name} ({regressionSet.platform})
             </p>
           )}
+          <Button
+            type="button"
+            variant="secondary"
+            className="mt-2 text-sm px-3 py-1.5"
+            onClick={handleExport}
+          >
+            Export to Excel
+          </Button>
         </div>
         {run.status === 'In Progress' && (
           <div className="flex flex-wrap gap-2">

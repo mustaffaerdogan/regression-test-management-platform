@@ -143,4 +143,25 @@ export const getRunHistory = async (
   };
 };
 
+export const exportRunToExcel = async (runId: string): Promise<void> => {
+  const response = await fetch(`${API_BASE_URL}/test-runs/${runId}/export`, {
+    method: 'GET',
+    headers: getAuthHeaders(),
+  });
+
+  if (!response.ok) {
+    throw new Error('Failed to export test run to Excel');
+  }
+
+  const blob = await response.blob();
+  const url = window.URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `TestRun_${runId}.xlsx`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  window.URL.revokeObjectURL(url);
+};
+
 

@@ -12,6 +12,7 @@ import {
   removeMember,
   leaveTeam,
   regenerateInviteCode,
+  updateMemberRole,
 } from '../controllers/team.controller';
 import {
   createTeamValidations,
@@ -19,6 +20,7 @@ import {
   inviteMemberValidations,
   joinTeamValidations,
   removeMemberValidations,
+  updateMemberRoleValidations,
 } from '../validation/team.validation';
 
 const router = Router();
@@ -37,6 +39,7 @@ router.delete('/:id', deleteTeam);
 
 router.post('/:id/invite', validate(inviteMemberValidations), inviteMember);
 router.post('/:id/regenerate-invite', regenerateInviteCode);
+router.put('/:id/members/:userId/role', validate(updateMemberRoleValidations), updateMemberRole);
 router.delete('/:id/members/:userId', validate(removeMemberValidations), removeMember);
 router.delete('/:id/leave', leaveTeam);
 

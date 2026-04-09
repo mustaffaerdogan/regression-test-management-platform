@@ -140,3 +140,53 @@ export const getMe = async (
   }
 };
 
+export const updateProfileValidations = [
+  body('name').trim().notEmpty().withMessage('Name is required'),
+  body('password')
+    .optional()
+    .isLength({ min: 6 })
+    .withMessage('Password must be at least 6 characters long'),
+];
+
+export const updateProfile = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> => {
+  try {
+    if (!req.user) {
+      const error: ApiError = new Error('User not authenticated');
+      error.statusCode = 401;
+      throw error;
+    }
+
+    const user = await User.findById(req.user.id);
+    if (!user) {
+      const error: ApiError = new Error('User not found');
+      error.statusCode = 404;
+      throw error;
+    }
+
+    const { name, password } = req.body;
+
+    user.name = name;
+    if (password) {
+      user.password = password;
+    }
+
+    await user.save();
+
+    res.status(200).json({
+      success: true,
+      message: 'Profile updated successfully',
+      user: {
+        id: user._id.toString(),
+        name: user.name,
+        email: user.email,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+

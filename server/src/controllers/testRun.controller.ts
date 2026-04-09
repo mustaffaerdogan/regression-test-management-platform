@@ -1,11 +1,12 @@
 import { Request, Response, NextFunction } from 'express';
 import { Types } from 'mongoose';
+import ExcelJS from 'exceljs';
 import RegressionSet from '../models/RegressionSet.model';
 import TestCase from '../models/TestCase.model';
 import Run, { IRun } from '../models/Run';
 import RunItem, { IRunItem } from '../models/RunItem';
 import { ApiError } from '../middleware/error.middleware';
-import { canAccessRegressionSet, getMyTeamIds } from '../utils/authorization';
+import { canAccessRegressionSet, canExecuteRegressionSet, getMyTeamIds } from '../utils/authorization';
 
 interface AuthedRequest extends Request {
   user?: {
@@ -40,6 +41,33 @@ const ensureRunAccess = async (run: IRun, req: AuthedRequest): Promise<boolean> 
   return true;
 };
 
+const ensureExecuteRunAccess = async (run: IRun, req: AuthedRequest): Promise<boolean> => {
+  if (!req.user) {
+    (req.res as Response).status(401).json({
+      success: false,
+      message: 'User not authenticated',
+    });
+    return false;
+  }
+
+  const regressionSet = await RegressionSet.findById(run.regressionSet);
+  if (!regressionSet) {
+    const error: ApiError = new Error('Regression set not found');
+    error.statusCode = 404;
+    throw error;
+  }
+
+  const allowed = await canExecuteRegressionSet(regressionSet as any, req.user.id);
+  if (!allowed) {
+    (req.res as Response).status(403).json({
+      success: false,
+      message: 'Unauthorized',
+    });
+    return false;
+  }
+  return true;
+};
+
 export const startRun = async (
   req: AuthedRequest,
   res: Response,
@@ -62,7 +90,7 @@ export const startRun = async (
       throw error;
     }
 
-    const allowed = await canAccessRegressionSet(regressionSet as any, req.user.id);
+    const allowed = await canExecuteRegressionSet(regressionSet as any, req.user.id);
     if (!allowed) {
       res.status(403).json({
         success: false,
@@ -194,7 +222,7 @@ export const getNextRunItem = async (
       throw error;
     }
 
-    if (!(await ensureRunAccess(run, req))) {
+    if (!(await ensureExecuteRunAccess(run, req))) {
       return;
     }
 
@@ -264,7 +292,7 @@ export const updateRunItem = async (
       throw error;
     }
 
-    if (!(await ensureRunAccess(run, req))) {
+    if (!(await ensureExecuteRunAccess(run, req))) {
       return;
     }
 
@@ -376,7 +404,7 @@ export const cancelRun = async (
       throw error;
     }
 
-    if (!(await ensureRunAccess(run, req))) {
+    if (!(await ensureExecuteRunAccess(run, req))) {
       return;
     }
 
@@ -501,7 +529,7 @@ export const bulkUpdateRunItems = async (
       throw error;
     }
 
-    if (!(await ensureRunAccess(run, req))) {
+    if (!(await ensureExecuteRunAccess(run, req))) {
       return;
     }
 
@@ -545,6 +573,97 @@ export const bulkUpdateRunItems = async (
       message: `Updated ${pendingCount} items as ${status}`,
       data: updatedRun,
     });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const exportRunToExcel = async (
+  req: AuthedRequest,
+  res: Response,
+  next: NextFunction,
+): Promise<void> => {
+  try {
+    if (!req.user) {
+      const error: ApiError = new Error('User not authenticated');
+      error.statusCode = 401;
+      throw error;
+    }
+
+    const { runId } = req.params;
+
+    const run = await Run.findById(runId)
+      .populate('regressionSet', 'name platform')
+      .populate('startedBy', 'name email')
+      .lean()
+      .exec();
+
+    if (!run) {
+      const error: ApiError = new Error('Run not found');
+      error.statusCode = 404;
+      throw error;
+    }
+
+    const regressionSet = await RegressionSet.findById((run as any).regressionSet?._id ?? run.regressionSet);
+    if (!regressionSet) {
+      const error: ApiError = new Error('Regression set not found');
+      error.statusCode = 404;
+      throw error;
+    }
+    const allowed = await canAccessRegressionSet(regressionSet as any, req.user.id);
+    if (!allowed) {
+      res.status(403).json({
+        success: false,
+        message: 'Unauthorized',
+      });
+      return;
+    }
+
+    const runItems = await RunItem.find({ run: run._id })
+      .sort({ order: 1 })
+      .populate('testCase', 'testCaseId module testScenario testCase preConditions expectedResult')
+      .lean()
+      .exec();
+
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet('Test Run Results');
+
+    worksheet.columns = [
+      { header: 'Test Case ID', key: 'tcId', width: 15 },
+      { header: 'Module', key: 'module', width: 20 },
+      { header: 'Test Scenario', key: 'scenario', width: 30 },
+      { header: 'Test Case', key: 'testCase', width: 40 },
+      { header: 'Pre-Conditions', key: 'preConditions', width: 30 },
+      { header: 'Expected Result', key: 'expected', width: 30 },
+      { header: 'Status', key: 'status', width: 15 },
+      { header: 'Actual Results', key: 'actual', width: 30 },
+      { header: 'Executed By', key: 'executedBy', width: 20 },
+      { header: 'Completed At', key: 'completedAt', width: 25 },
+    ];
+
+    // Style headers
+    worksheet.getRow(1).font = { bold: true };
+
+    runItems.forEach((item: any) => {
+      worksheet.addRow({
+        tcId: item.testCase?.testCaseId,
+        module: item.testCase?.module,
+        scenario: item.testCase?.testScenario,
+        testCase: item.testCase?.testCase,
+        preConditions: item.testCase?.preConditions,
+        expected: item.testCase?.expectedResult,
+        status: item.status,
+        actual: item.actualResults || '',
+        executedBy: (run.startedBy as any)?.name || (run.startedBy as any)?.email || 'Admin',
+        completedAt: item.completedAt ? new Date(item.completedAt).toLocaleString() : '',
+      });
+    });
+
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename="TestRun_${run._id}.xlsx"`);
+
+    await workbook.xlsx.write(res);
+    res.end();
   } catch (error) {
     next(error);
   }

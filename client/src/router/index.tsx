@@ -11,6 +11,7 @@ import { DashboardPage } from '../pages/Dashboard/DashboardPage';
 import { TeamListPage } from '../pages/Teams/TeamListPage';
 import { TeamDetailPage } from '../pages/Teams/TeamDetailPage';
 import { AICasesPage } from '../pages/AICases/AICasesPage';
+import { ProfileSettingsPage } from '../pages/Settings/ProfileSettingsPage';
 
 const router = createBrowserRouter([
   {
@@ -60,6 +61,10 @@ const router = createBrowserRouter([
       {
         path: '/ai-cases',
         element: <AICasesPage />,
+      },
+      {
+        path: '/settings',
+        element: <ProfileSettingsPage />,
       },
     ],
   },

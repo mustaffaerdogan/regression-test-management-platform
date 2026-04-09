@@ -66,11 +66,11 @@ export const deleteTeam = async (id: string): Promise<{ success: boolean; messag
   return handleResponse<{ success: boolean; message: string }>(response);
 };
 
-export const inviteMember = async (teamId: string, email: string): Promise<TeamResponse> => {
+export const inviteMember = async (teamId: string, email: string, role?: string): Promise<TeamResponse> => {
   const response = await fetch(`${API_BASE_URL}/teams/${teamId}/invite`, {
     method: 'POST',
     headers: getAuthHeaders(),
-    body: JSON.stringify({ email }),
+    body: JSON.stringify({ email, role }),
   });
   return handleResponse<TeamResponse>(response);
 };
@@ -110,6 +110,15 @@ export const regenerateInviteCode = async (
   return handleResponse<{ success: boolean; message: string; data: { inviteCode: string } }>(
     response,
   );
+};
+
+export const updateMemberRole = async (teamId: string, userId: string, role: string): Promise<TeamResponse> => {
+  const response = await fetch(`${API_BASE_URL}/teams/${teamId}/members/${userId}/role`, {
+    method: 'PUT',
+    headers: getAuthHeaders(),
+    body: JSON.stringify({ role }),
+  });
+  return handleResponse<TeamResponse>(response);
 };
 
 export type { Team };

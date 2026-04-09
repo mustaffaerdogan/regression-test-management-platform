@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
-import { getRunHistory } from '../../api/testRuns';
+import { getRunHistory, exportRunToExcel } from '../../api/testRuns';
 import type { RunStatus, RunHistoryQuery, Run } from '../../types/testRun';
 import { RunHistoryTable } from './components/RunHistoryTable';
 import { Button } from '../../components/Button';
@@ -66,6 +66,14 @@ export const TestRunHistoryPage = () => {
 
   const handleExecute = (runId: string) => {
     navigate(`/test-runs/${runId}/execute`);
+  };
+
+  const handleExport = async (runId: string) => {
+    try {
+      await exportRunToExcel(runId);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to export test run.');
+    }
   };
 
   const totalPages = Math.max(1, Math.ceil(total / limit));
@@ -151,7 +159,7 @@ export const TestRunHistoryPage = () => {
 
       {!loading && !error && (
         <>
-          <RunHistoryTable runs={runs} onView={handleView} onExecute={handleExecute} />
+          <RunHistoryTable runs={runs} onView={handleView} onExecute={handleExecute} onExport={handleExport} />
 
           {total > 0 && (
             <div className="flex items-center justify-between mt-4 text-xs text-gray-600 dark:text-gray-400">

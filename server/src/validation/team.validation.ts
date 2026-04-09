@@ -49,3 +49,14 @@ export const removeMemberValidations = [
   param('id').isMongoId().withMessage('Invalid team ID'),
   param('userId').isMongoId().withMessage('Invalid user ID'),
 ];
+
+export const updateMemberRoleValidations = [
+  param('id').isMongoId().withMessage('Invalid team ID'),
+  param('userId').isMongoId().withMessage('Invalid user ID'),
+  body('role')
+    .trim()
+    .notEmpty()
+    .withMessage('Role is required')
+    .isIn(['admin', 'qa_lead', 'tester', 'viewer'])
+    .withMessage('Invalid role'),
+];

@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { ApiError } from '../middleware/error.middleware';
 import { generateRegressionSetsFromText, LLMRequestError } from '../utils/aiCases';
+import { fetchAndExtractJiraData } from '../utils/jira';
 
 export const generateCases = async (
   req: Request,
@@ -51,6 +52,37 @@ export const generateCases = async (
       }
       throw error;
     }
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const extractJira = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> => {
+  try {
+    if (!req.user) {
+      const error: ApiError = new Error('User not authenticated');
+      error.statusCode = 401;
+      throw error;
+    }
+
+    const { jiraUrl } = req.body as { jiraUrl: string };
+    if (!jiraUrl) {
+      const error: ApiError = new Error('jiraUrl is required');
+      error.statusCode = 400;
+      throw error;
+    }
+
+    const result = await fetchAndExtractJiraData(jiraUrl);
+
+    res.status(200).json({
+      success: true,
+      message: 'Extracted data from Jira',
+      data: result,
+    });
   } catch (error) {
     next(error);
   }

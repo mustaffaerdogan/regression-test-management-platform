@@ -2,7 +2,7 @@ import mongoose, { Schema, Document, Types } from 'mongoose';
 import { randomUUID } from 'crypto';
 
 
-export type TeamRole = 'owner' | 'member';
+export type TeamRole = 'admin' | 'qa_lead' | 'tester' | 'viewer';
 
 export interface ITeamMember {
   user: Types.ObjectId;
@@ -28,8 +28,8 @@ const teamMemberSchema = new Schema<ITeamMember>(
     },
     role: {
       type: String,
-      enum: ['owner', 'member'],
-      default: 'member',
+      enum: ['admin', 'qa_lead', 'tester', 'viewer'],
+      default: 'viewer',
     },
     joinedAt: {
       type: Date,

@@ -7,6 +7,7 @@ import {
   deleteTeam,
   inviteMember,
   removeMember,
+  updateMemberRole,
   leaveTeam,
   regenerateInviteCode,
 } from '../../api/teams';
@@ -33,6 +34,7 @@ export const TeamDetailPage = () => {
 
   // Invite form
   const [inviteEmail, setInviteEmail] = useState('');
+  const [inviteRole, setInviteRole] = useState('viewer');
   const [inviteLoading, setInviteLoading] = useState(false);
   const [inviteError, setInviteError] = useState('');
   const [inviteSuccess, setInviteSuccess] = useState('');
@@ -42,6 +44,13 @@ export const TeamDetailPage = () => {
   const [editDesc, setEditDesc] = useState('');
   const [editLoading, setEditLoading] = useState(false);
   const [editError, setEditError] = useState('');
+
+  // Edit Role Modal
+  const [showEditRoleModal, setShowEditRoleModal] = useState(false);
+  const [editingUserId, setEditingUserId] = useState('');
+  const [editingRole, setEditingRole] = useState('');
+  const [editRoleLoading, setEditRoleLoading] = useState(false);
+  const [editRoleError, setEditRoleError] = useState('');
 
   // Copied state
   const [codeCopied, setCodeCopied] = useState(false);
@@ -104,7 +113,7 @@ export const TeamDetailPage = () => {
     setInviteError('');
     setInviteSuccess('');
     try {
-      const res = await inviteMember(id, inviteEmail.trim());
+      const res = await inviteMember(id, inviteEmail.trim(), inviteRole);
       setTeam(res.data);
       setInviteSuccess(`${inviteEmail} has been added to the team`);
       setInviteEmail('');
@@ -122,6 +131,22 @@ export const TeamDetailPage = () => {
       setTeam(res.data);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to remove member');
+    }
+  };
+
+  const handleUpdateRole = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!id || !editingUserId) return;
+    setEditRoleLoading(true);
+    setEditRoleError('');
+    try {
+      const res = await updateMemberRole(id, editingUserId, editingRole);
+      setTeam(res.data);
+      setShowEditRoleModal(false);
+    } catch (err) {
+      setEditRoleError(err instanceof Error ? err.message : 'Failed to update member role');
+    } finally {
+      setEditRoleLoading(false);
     }
   };
 
@@ -290,12 +315,25 @@ export const TeamDetailPage = () => {
                     {member.role}
                   </span>
                   {isOwner && !isCurrentUser && (
-                    <button
-                      onClick={() => handleRemoveMember(member.user._id)}
-                      className="text-xs text-red-500 hover:text-red-700 dark:hover:text-red-400 transition-colors"
-                    >
-                      Remove
-                    </button>
+                    <div className="flex items-center gap-3">
+                      <button
+                        onClick={() => {
+                          setEditingUserId(member.user._id);
+                          setEditingRole(member.role);
+                          setEditRoleError('');
+                          setShowEditRoleModal(true);
+                        }}
+                        className="text-xs text-indigo-500 hover:text-indigo-700 dark:hover:text-indigo-400 transition-colors"
+                      >
+                        Edit Role
+                      </button>
+                      <button
+                        onClick={() => handleRemoveMember(member.user._id)}
+                        className="text-xs text-red-500 hover:text-red-700 dark:hover:text-red-400 transition-colors"
+                      >
+                        Remove
+                      </button>
+                    </div>
                   )}
                 </div>
               </li>
@@ -370,6 +408,21 @@ export const TeamDetailPage = () => {
             placeholder="user@example.com"
             required
           />
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Role
+            </label>
+            <select
+              value={inviteRole}
+              onChange={(e) => setInviteRole(e.target.value)}
+              className="w-full rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            >
+              <option value="admin">Admin</option>
+              <option value="qa_lead">QA Lead</option>
+              <option value="tester">Tester</option>
+              <option value="viewer">Viewer</option>
+            </select>
+          </div>
           <p className="text-xs text-gray-500 dark:text-gray-400">
             The user must already have an account on the platform.
           </p>
@@ -406,6 +459,44 @@ export const TeamDetailPage = () => {
             </Button>
           </div>
         </div>
+      </Modal>
+
+      {/* Edit Role Modal */}
+      <Modal
+        isOpen={showEditRoleModal}
+        onClose={() => setShowEditRoleModal(false)}
+        title="Edit Member Role"
+      >
+        <form onSubmit={handleUpdateRole} className="space-y-4">
+          {editRoleError && (
+            <div className="p-3 bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400 rounded-lg text-sm">
+              {editRoleError}
+            </div>
+          )}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Role
+            </label>
+            <select
+              value={editingRole}
+              onChange={(e) => setEditingRole(e.target.value)}
+              className="w-full rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            >
+              <option value="admin">Admin</option>
+              <option value="qa_lead">QA Lead</option>
+              <option value="tester">Tester</option>
+              <option value="viewer">Viewer</option>
+            </select>
+          </div>
+          <div className="flex justify-end gap-3 pt-2">
+            <Button type="button" variant="secondary" onClick={() => setShowEditRoleModal(false)}>
+              Cancel
+            </Button>
+            <Button type="submit" disabled={editRoleLoading}>
+              {editRoleLoading ? 'Saving...' : 'Save Role'}
+            </Button>
+          </div>
+        </form>
       </Modal>
     </div>
   );

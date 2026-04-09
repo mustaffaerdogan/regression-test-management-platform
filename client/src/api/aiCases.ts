@@ -34,3 +34,14 @@ export const generateAICases = async (payload: {
   return handleResponse<AICasesResponse>(response);
 };
 
+export const extractJiraDataFromApi = async (
+  jiraUrl: string
+): Promise<ApiResponse<{ userStory: string; acceptanceCriteria: string[] }>> => {
+  const response = await fetch(`${API_BASE_URL}/ai-cases/extract-jira`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: JSON.stringify({ jiraUrl }),
+  });
+
+  return handleResponse<{ userStory: string; acceptanceCriteria: string[] }>(response);
+};
