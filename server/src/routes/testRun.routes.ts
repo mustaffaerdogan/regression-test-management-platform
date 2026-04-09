@@ -10,6 +10,7 @@ import {
   startRun,
   updateRunItem,
   exportRunToExcel,
+  retestFailedSkipped,
 } from '../controllers/testRun.controller';
 import {
   bulkUpdateRunValidation,
@@ -34,6 +35,7 @@ router.get('/:runId/next', validate(runIdParamValidation), getNextRunItem);
 router.get('/:runId/export', validate(runIdParamValidation), exportRunToExcel);
 router.put('/update-item/:itemId', validate(updateRunItemValidation), updateRunItem);
 router.put('/cancel/:runId', validate(cancelRunValidation), cancelRun);
+router.post('/:runId/retest', validate(runIdParamValidation), retestFailedSkipped);
 
 export default router;
 

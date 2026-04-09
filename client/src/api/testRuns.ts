@@ -164,4 +164,11 @@ export const exportRunToExcel = async (runId: string): Promise<void> => {
   window.URL.revokeObjectURL(url);
 };
 
+export const retestFailedSkippedAPI = async (runId: string): Promise<ApiResponse<Run>> => {
+  const response = await fetch(`${API_BASE_URL}/test-runs/${runId}/retest`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+  });
 
+  return handleResponse<Run>(response);
+};

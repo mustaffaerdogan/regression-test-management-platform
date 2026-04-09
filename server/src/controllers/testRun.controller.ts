@@ -671,4 +671,81 @@ export const exportRunToExcel = async (
   }
 };
 
+export const retestFailedSkipped = async (
+  req: AuthedRequest,
+  res: Response,
+  next: NextFunction,
+): Promise<void> => {
+  try {
+    if (!req.user) {
+      const error: ApiError = new Error('User not authenticated');
+      error.statusCode = 401;
+      throw error;
+    }
+
+    const { runId } = req.params;
+
+    const run = await Run.findById(runId);
+    if (!run) {
+      const error: ApiError = new Error('Run not found');
+      error.statusCode = 404;
+      throw error;
+    }
+
+    if (!(await ensureExecuteRunAccess(run, req))) {
+      return;
+    }
+
+    // Find items that failed or were skipped
+    const itemsToRetest = await RunItem.find({
+      run: run._id,
+      status: { $in: ['Fail', 'Skipped'] }
+    }).select('_id status').lean();
+
+    if (itemsToRetest.length === 0) {
+      res.status(400).json({
+        success: false,
+        message: 'No failed or skipped items to retest',
+      });
+      return;
+    }
+
+    let failCount = 0;
+    let skipCount = 0;
+
+    itemsToRetest.forEach(item => {
+      if (item.status === 'Fail') failCount++;
+      if (item.status === 'Skipped') skipCount++;
+    });
+
+    // Reset items
+    await RunItem.updateMany(
+      { _id: { $in: itemsToRetest.map(i => i._id) } },
+      { 
+        $set: { status: 'Not Executed' },
+        $unset: { actualResults: '', completedAt: '', startedAt: '', executedBy: '' }
+      }
+    );
+
+    // Update run stats
+    const updatedRun = await Run.findByIdAndUpdate(
+      run._id,
+      {
+        $inc: { failed: -failCount, skipped: -skipCount },
+        $set: { status: 'In Progress' },
+        $unset: { completedAt: '' }
+      },
+      { new: true }
+    );
+
+    res.status(200).json({
+      success: true,
+      message: `${itemsToRetest.length} items reset for retesting`,
+      data: updatedRun,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 

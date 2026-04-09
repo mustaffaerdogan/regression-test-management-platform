@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Navigate, useNavigate, useParams } from 'react-router-dom';
-import { bulkUpdateRunItems, getRunById, exportRunToExcel } from '../../api/testRuns';
+import { bulkUpdateRunItems, getRunById, exportRunToExcel, retestFailedSkippedAPI } from '../../api/testRuns';
 import type { Run, RunItem } from '../../types/testRun';
 import { RunSummaryCard } from './components/RunSummaryCard';
 import { RunStatusBadge } from './components/RunStatusBadge';
@@ -17,6 +17,23 @@ export const TestRunDetailPage = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [bulkLoading, setBulkLoading] = useState(false);
+  const [retestLoading, setRetestLoading] = useState(false);
+
+  const handleRetest = async () => {
+    if (!runId || !run) return;
+    if (!window.confirm(`Are you sure you want to reset all failed and skipped cases to retest them?`)) return;
+    setRetestLoading(true);
+    setError(null);
+    try {
+      await retestFailedSkippedAPI(runId);
+      await fetchData();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to retest cases.');
+    } finally {
+      setRetestLoading(false);
+    }
+  };
+
   const handleBulkMark = async (status: 'Pass' | 'Fail' | 'Skipped') => {
     if (!runId || !run) return;
     if (!window.confirm(`Mark all remaining test cases as ${status}?`)) return;
@@ -114,6 +131,8 @@ export const TestRunDetailPage = () => {
   const regressionSet =
     typeof run.regressionSet === 'string' ? undefined : run.regressionSet;
 
+  const hasFailsOrSkips = items.some(item => item.status === 'Fail' || item.status === 'Skipped');
+
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -134,6 +153,17 @@ export const TestRunDetailPage = () => {
           >
             Export to Excel
           </Button>
+          {hasFailsOrSkips && run.status !== 'Cancelled' && (
+            <Button
+              type="button"
+              variant="secondary"
+              className="mt-2 ml-2 text-sm px-3 py-1.5 border-orange-300 text-orange-700 hover:bg-orange-50 dark:border-orange-700/50 dark:text-orange-400 dark:hover:bg-orange-900/30"
+              onClick={handleRetest}
+              disabled={retestLoading}
+            >
+              {retestLoading ? 'Resetting...' : 'Retest Failed & Skipped'}
+            </Button>
+          )}
         </div>
         {run.status === 'In Progress' && (
           <div className="flex flex-wrap gap-2">
@@ -233,16 +263,7 @@ export const TestRunDetailPage = () => {
                     {item.testCase.testScenario}
                   </td>
                   <td className="px-3 py-2 whitespace-nowrap">
-                    <RunStatusBadge
-                      // map RunItemStatus -> one of badge styles by reusing text
-                      status={
-                        item.status === 'Not Executed'
-                          ? 'In Progress'
-                          : item.status === 'Pass'
-                          ? 'Completed'
-                          : 'Cancelled'
-                      }
-                    />
+                    <RunStatusBadge status={item.status} />
                   </td>
                   <td className="px-3 py-2 whitespace-nowrap text-gray-700 dark:text-gray-200">
                     {item.completedAt
