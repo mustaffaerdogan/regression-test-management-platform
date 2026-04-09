@@ -306,6 +306,7 @@ export const updateRunItem = async (
       runItem.startedAt = new Date();
     }
     runItem.completedAt = new Date();
+    runItem.executedBy = new Types.ObjectId(req.user.id) as any;
 
     await runItem.save();
 
@@ -554,7 +555,7 @@ export const bulkUpdateRunItems = async (
 
     await RunItem.updateMany(
       { run: run._id, status: 'Not Executed' },
-      { $set: { status, startedAt: now, completedAt: now } },
+      { $set: { status, startedAt: now, completedAt: now, executedBy: new Types.ObjectId(req.user.id) } },
     );
 
     const incObj: { passed?: number; failed?: number; skipped?: number } = {};
@@ -622,6 +623,7 @@ export const exportRunToExcel = async (
     const runItems = await RunItem.find({ run: run._id })
       .sort({ order: 1 })
       .populate('testCase', 'testCaseId module testScenario testCase preConditions expectedResult')
+      .populate('executedBy', 'name email')
       .lean()
       .exec();
 
@@ -654,7 +656,7 @@ export const exportRunToExcel = async (
         expected: item.testCase?.expectedResult,
         status: item.status,
         actual: item.actualResults || '',
-        executedBy: (run.startedBy as any)?.name || (run.startedBy as any)?.email || 'Admin',
+        executedBy: (item.executedBy as any)?.name || (item.executedBy as any)?.email || (run.startedBy as any)?.name || (run.startedBy as any)?.email || 'Admin',
         completedAt: item.completedAt ? new Date(item.completedAt).toLocaleString() : '',
       });
     });

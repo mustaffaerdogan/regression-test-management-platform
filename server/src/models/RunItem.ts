@@ -10,6 +10,7 @@ export interface IRunItem extends Document {
   actualResults?: string;
   startedAt?: Date;
   completedAt?: Date;
+  executedBy?: Types.ObjectId;
 }
 
 const runItemSchema = new Schema<IRunItem>(
@@ -43,6 +44,10 @@ const runItemSchema = new Schema<IRunItem>(
     },
     completedAt: {
       type: Date,
+    },
+    executedBy: {
+      type: Schema.Types.ObjectId,
+      ref: 'User',
     },
   },
   {
