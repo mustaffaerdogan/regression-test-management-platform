@@ -11,6 +11,7 @@ export interface IRunItem extends Document {
   startedAt?: Date;
   completedAt?: Date;
   executedBy?: Types.ObjectId;
+  jiraIssueKey?: string;
 }
 
 const runItemSchema = new Schema<IRunItem>(
@@ -49,6 +50,9 @@ const runItemSchema = new Schema<IRunItem>(
       type: Schema.Types.ObjectId,
       ref: 'User',
     },
+    jiraIssueKey: {
+      type: String,
+    },
   },
   {
     timestamps: false,
@@ -60,5 +64,3 @@ runItemSchema.index({ run: 1, order: 1 });
 const RunItem = mongoose.model<IRunItem>('RunItem', runItemSchema);
 
 export default RunItem;
-
-

@@ -12,6 +12,11 @@ export interface IRun extends Document {
   passed: number;
   failed: number;
   skipped: number;
+  jiraIssueKey?: string;
+  jiraSuccessStatus?: string;
+  jiraFailureStatus?: string;
+  jiraBugIssueType?: string;
+  jiraBugStatus?: string;
 }
 
 const runSchema = new Schema<IRun>(
@@ -58,6 +63,21 @@ const runSchema = new Schema<IRun>(
       required: true,
       default: 0,
     },
+    jiraIssueKey: {
+      type: String,
+    },
+    jiraSuccessStatus: {
+      type: String,
+    },
+    jiraFailureStatus: {
+      type: String,
+    },
+    jiraBugIssueType: {
+      type: String,
+    },
+    jiraBugStatus: {
+      type: String,
+    },
   },
   {
     timestamps: false,
@@ -67,5 +87,3 @@ const runSchema = new Schema<IRun>(
 const Run = mongoose.model<IRun>('Run', runSchema);
 
 export default Run;
-
-

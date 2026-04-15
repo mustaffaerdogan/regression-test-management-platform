@@ -5,6 +5,7 @@ import type { RunStatus, RunHistoryQuery, Run } from '../../types/testRun';
 import { RunHistoryTable } from './components/RunHistoryTable';
 import { Button } from '../../components/Button';
 import { useAuth } from '../../hooks/useAuth';
+import { JiraIntegrationPanel } from '../../components/JiraIntegrationPanel';
 
 const STATUS_OPTIONS: (RunStatus | 'All')[] = ['All', 'In Progress', 'Completed', 'Cancelled'];
 const PLATFORM_OPTIONS = ['All', 'Web', 'iOS', 'Android', 'TV'] as const;
@@ -15,6 +16,7 @@ export const TestRunHistoryPage = () => {
   const [runs, setRuns] = useState<Run[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   const [status, setStatus] = useState<RunStatus | 'All'>('All');
   const [platform, setPlatform] = useState<(typeof PLATFORM_OPTIONS)[number]>('All');
@@ -88,6 +90,17 @@ export const TestRunHistoryPage = () => {
           </p>
         </div>
       </div>
+
+      <JiraIntegrationPanel 
+        onSuccess={(msg) => setSuccessMessage(msg)}
+        onError={(err) => setError(err)}
+      />
+
+      {successMessage && (
+        <div className="rounded-2xl bg-green-50 dark:bg-green-900/20 p-4 text-sm text-green-700 dark:text-green-200 border border-green-100 dark:border-green-800 font-bold animate-in fade-in slide-in-from-top-1">
+          {successMessage}
+        </div>
+      )}
 
       <div className="flex flex-col md:flex-row gap-3 items-start md:items-end">
         <div className="flex flex-col gap-1">

@@ -32,11 +32,11 @@ export const generateCases = async (
 
       res.status(200).json({
         success: true,
-        message: 'AI regression set suggestions generated (max 3 test cases per request)',
+        message: 'AI regression set suggestions generated (max 5 test cases per request)',
         data: {
           ...result,
           limits: {
-            maxTestCasesPerRequest: 3,
+            maxTestCasesPerRequest: 5,
             generatedTestCases: result.regressionSets[0]?.testCases.length ?? 0,
           },
         },

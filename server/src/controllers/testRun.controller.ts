@@ -3,10 +3,12 @@ import { Types } from 'mongoose';
 import ExcelJS from 'exceljs';
 import RegressionSet from '../models/RegressionSet.model';
 import TestCase from '../models/TestCase.model';
+import User from '../models/User.model';
 import Run, { IRun } from '../models/Run';
 import RunItem, { IRunItem } from '../models/RunItem';
 import { ApiError } from '../middleware/error.middleware';
 import { canAccessRegressionSet, canExecuteRegressionSet, getMyTeamIds } from '../utils/authorization';
+import { createJiraIssue, addJiraComment, transitionJiraIssue, getJiraIssueTypes } from '../utils/jira';
 
 interface AuthedRequest extends Request {
   user?: {
@@ -15,57 +17,17 @@ interface AuthedRequest extends Request {
 }
 
 const ensureRunAccess = async (run: IRun, req: AuthedRequest): Promise<boolean> => {
-  if (!req.user) {
-    (req.res as Response).status(401).json({
-      success: false,
-      message: 'User not authenticated',
-    });
-    return false;
-  }
-
+  if (!req.user) return false;
   const regressionSet = await RegressionSet.findById(run.regressionSet);
-  if (!regressionSet) {
-    const error: ApiError = new Error('Regression set not found');
-    error.statusCode = 404;
-    throw error;
-  }
-
-  const allowed = await canAccessRegressionSet(regressionSet as any, req.user.id);
-  if (!allowed) {
-    (req.res as Response).status(403).json({
-      success: false,
-      message: 'Unauthorized',
-    });
-    return false;
-  }
-  return true;
+  if (!regressionSet) return false;
+  return await canAccessRegressionSet(regressionSet as any, req.user.id);
 };
 
 const ensureExecuteRunAccess = async (run: IRun, req: AuthedRequest): Promise<boolean> => {
-  if (!req.user) {
-    (req.res as Response).status(401).json({
-      success: false,
-      message: 'User not authenticated',
-    });
-    return false;
-  }
-
+  if (!req.user) return false;
   const regressionSet = await RegressionSet.findById(run.regressionSet);
-  if (!regressionSet) {
-    const error: ApiError = new Error('Regression set not found');
-    error.statusCode = 404;
-    throw error;
-  }
-
-  const allowed = await canExecuteRegressionSet(regressionSet as any, req.user.id);
-  if (!allowed) {
-    (req.res as Response).status(403).json({
-      success: false,
-      message: 'Unauthorized',
-    });
-    return false;
-  }
-  return true;
+  if (!regressionSet) return false;
+  return await canExecuteRegressionSet(regressionSet as any, req.user.id);
 };
 
 export const startRun = async (
@@ -81,7 +43,6 @@ export const startRun = async (
     }
 
     const { regressionSetId } = req.params;
-
     const regressionSet = await RegressionSet.findById(regressionSetId);
 
     if (!regressionSet) {
@@ -92,48 +53,100 @@ export const startRun = async (
 
     const allowed = await canExecuteRegressionSet(regressionSet as any, req.user.id);
     if (!allowed) {
-      res.status(403).json({
-        success: false,
-        message: 'Unauthorized',
-      });
+      res.status(403).json({ success: false, message: 'Unauthorized' });
       return;
     }
 
-    const testCases = await TestCase.find({ regressionSet: regressionSet._id })
-      .sort({ createdAt: 1 })
-      .lean()
-      .exec();
+    const { 
+      jiraProjectKey, 
+      jiraAssignee, 
+      jiraBoardId, 
+      jiraStatus, 
+      jiraBugIssueType,
+      jiraBugStatus,
+      jiraIssueKey,
+      summary: runSummary,
+      testCaseIds: selectedIds 
+    } = req.body as { 
+      jiraProjectKey?: string; 
+      jiraAssignee?: string;
+      jiraBoardId?: string;
+      jiraStatus?: string;
+      jiraBugIssueType?: string;
+      jiraBugStatus?: string;
+      jiraIssueKey?: string;
+      summary?: string;
+      testCaseIds?: string[];
+    };
 
-    const totalCases = testCases.length;
+    const query: any = { regressionSet: regressionSet._id };
+    if (selectedIds && selectedIds.length > 0) {
+      query._id = { $in: selectedIds };
+    }
 
-    const run = await Run.create({
+    const testCases = await TestCase.find(query).sort({ createdAt: 1 }).lean().exec();
+
+    if (testCases.length === 0) {
+      res.status(400).json({ success: false, message: 'No test cases selected' });
+      return;
+    }
+
+    let mainJiraKey: string | undefined = jiraIssueKey;
+
+    if (jiraProjectKey && !mainJiraKey) {
+      try {
+        const jiraIssue = await createJiraIssue({
+          projectKey: jiraProjectKey as string,
+          summary: runSummary || `Regression Run - ${regressionSet.name} - ${new Date().toLocaleDateString()}`,
+          description: `Regression run started for ${regressionSet.name}.\nTotal cases: ${testCases.length}\nStarted by: ${req.user.id}\nBoard: ${jiraBoardId || '-'}.`,
+          assigneeId: jiraAssignee,
+          issueType: 'Task',
+        });
+        mainJiraKey = jiraIssue.key;
+
+        if (jiraStatus) {
+          await transitionJiraIssue(mainJiraKey, jiraStatus);
+        }
+      } catch (err) {
+        console.error('Failed to create main Jira task:', err);
+      }
+    } else if (mainJiraKey) {
+      // If linking to existing, post a comment that a run has started linked to this
+      try {
+        const user = await User.findById(req.user.id);
+        const userName = user?.name || 'A user';
+        await addJiraComment(mainJiraKey, `💡 *Regression Run Linked*\nA new regression run for *${regressionSet.name}* has been linked to this task.\nTotal cases: ${testCases.length}\nStarted by: ${userName} (ID: ${req.user.id})`);
+      } catch (err) {
+        console.error('Failed to comment on existing Jira task:', err);
+      }
+    }
+
+    const run: any = await Run.create({
       regressionSet: regressionSet._id,
       startedBy: new Types.ObjectId(req.user.id),
       status: 'In Progress',
-      totalCases,
+      totalCases: testCases.length,
       passed: 0,
       failed: 0,
       skipped: 0,
-    });
+      jiraIssueKey: mainJiraKey,
+      jiraBugIssueType,
+      jiraBugStatus,
+    } as any);
 
-    if (totalCases > 0) {
-      const runItems: Partial<IRunItem>[] = testCases.map((tc, index) => ({
-        run: run._id,
-        testCase: tc._id as Types.ObjectId,
-        order: index + 1,
-        status: 'Not Executed',
-      }));
+    const runItems: any[] = testCases.map((tc, index) => ({
+      run: run._id,
+      testCase: tc._id,
+      order: index + 1,
+      status: 'Not Executed',
+    }));
 
-      await RunItem.insertMany(runItems);
-    }
+    await RunItem.insertMany(runItems);
 
     res.status(201).json({
       success: true,
-      message: 'Run started',
-      data: {
-        runId: run._id,
-        totalCases,
-      },
+      message: 'Run started with Jira main task integration',
+      data: { runId: run._id, jiraIssueKey: mainJiraKey },
     });
   } catch (error) {
     next(error);
@@ -146,54 +159,26 @@ export const getRun = async (
   next: NextFunction,
 ): Promise<void> => {
   try {
-    if (!req.user) {
-      const error: ApiError = new Error('User not authenticated');
-      error.statusCode = 401;
-      throw error;
-    }
-
     const { runId } = req.params;
-
-    const run = await Run.findById(runId)
-      .populate('regressionSet', 'name platform')
-      .populate('startedBy', 'name')
-      .lean()
-      .exec();
-
+    const run = await Run.findById(runId).populate('regressionSet', 'name platform');
     if (!run) {
-      const error: ApiError = new Error('Run not found');
-      error.statusCode = 404;
-      throw error;
+      res.status(404).json({ success: false, message: 'Run not found' });
+      return;
     }
 
-    const regressionSet = await RegressionSet.findById((run as any).regressionSet?._id ?? run.regressionSet);
-    if (!regressionSet) {
-      const error: ApiError = new Error('Regression set not found');
-      error.statusCode = 404;
-      throw error;
-    }
-    const allowed = await canAccessRegressionSet(regressionSet as any, req.user.id);
-    if (!allowed) {
-      res.status(403).json({
-        success: false,
-        message: 'Unauthorized',
-      });
+    if (!(await ensureRunAccess(run, req))) {
+      res.status(403).json({ success: false, message: 'Unauthorized' });
       return;
     }
 
     const runItems = await RunItem.find({ run: run._id })
       .sort({ order: 1 })
-      .populate('testCase', 'testCaseId module testScenario status')
-      .lean()
+      .populate('testCase')
       .exec();
 
     res.status(200).json({
       success: true,
-      message: 'Run fetched',
-      data: {
-        run,
-        runItems,
-      },
+      data: { run, runItems },
     });
   } catch (error) {
     next(error);
@@ -206,54 +191,28 @@ export const getNextRunItem = async (
   next: NextFunction,
 ): Promise<void> => {
   try {
-    if (!req.user) {
-      const error: ApiError = new Error('User not authenticated');
-      error.statusCode = 401;
-      throw error;
-    }
-
     const { runId } = req.params;
-
     const run = await Run.findById(runId);
-
     if (!run) {
-      const error: ApiError = new Error('Run not found');
-      error.statusCode = 404;
-      throw error;
+      res.status(404).json({ success: false, message: 'Run not found' });
+      return;
     }
 
-    if (!(await ensureExecuteRunAccess(run, req))) {
+    if (!(await ensureRunAccess(run, req))) {
+      res.status(403).json({ success: false, message: 'Unauthorized' });
       return;
     }
 
     const nextItem = await RunItem.findOne({ run: run._id, status: 'Not Executed' })
       .sort({ order: 1 })
-      .populate(
-        'testCase',
-        'testCaseId userType platform module testScenario testCase preConditions testData testStep expectedResult actualResults status',
-      )
-      .lean()
+      .populate('testCase')
       .exec();
-
-    if (!nextItem) {
-      res.status(200).json({
-        success: true,
-        message: 'Run completed',
-        data: {
-          done: true,
-          run,
-        },
-      });
-      return;
-    }
 
     res.status(200).json({
       success: true,
-      message: 'Next run item fetched',
       data: {
-        done: false,
-        item: nextItem,
-        run,
+        done: !nextItem,
+        item: nextItem || null,
       },
     });
   } catch (error) {
@@ -276,16 +235,14 @@ export const updateRunItem = async (
     const { itemId } = req.params;
     const { status, actualResults } = req.body as { status: 'Pass' | 'Fail' | 'Skipped'; actualResults?: string };
 
-    const runItem = await RunItem.findById(itemId);
-
+    const runItem = await RunItem.findById(itemId).populate('testCase');
     if (!runItem) {
       const error: ApiError = new Error('Run item not found');
       error.statusCode = 404;
       throw error;
     }
 
-    const run = await Run.findById(runItem.run);
-
+    const run = await Run.findById(runItem.run).populate('regressionSet');
     if (!run) {
       const error: ApiError = new Error('Associated run not found');
       error.statusCode = 404;
@@ -293,11 +250,11 @@ export const updateRunItem = async (
     }
 
     if (!(await ensureExecuteRunAccess(run, req))) {
+      res.status(403).json({ success: false, message: 'Unauthorized' });
       return;
     }
 
     const previousStatus = runItem.status;
-
     runItem.status = status;
     if (typeof actualResults === 'string') {
       runItem.actualResults = actualResults;
@@ -310,73 +267,91 @@ export const updateRunItem = async (
 
     await runItem.save();
 
-    const inc: { passed?: number; failed?: number; skipped?: number } = {};
-    const dec: { passed?: number; failed?: number; skipped?: number } = {};
+    // 🔥 Automation: Auto-Bug on Failure
+    if (status === 'Fail' && run.jiraIssueKey) {
+      try {
+        const tc = runItem.testCase as any;
+        const bugDescription = `
+*BUG REPORTED FROM REGRESSION RUN*
+Run ID: ${run._id}
+Main Task: ${run.jiraIssueKey}
 
-    const bump = (map: { passed?: number; failed?: number; skipped?: number }, s: string, value: number) => {
-      if (s === 'Pass') map.passed = (map.passed ?? 0) + value;
-      if (s === 'Fail') map.failed = (map.failed ?? 0) + value;
-      if (s === 'Skipped') map.skipped = (map.skipped ?? 0) + value;
-    };
+Platform: ${tc.platform || '-'}
+Module: ${String(tc.module || '-')}
+Scenario: ${tc.testScenario || '-'}
+Test Case: ${tc.testCase}
+Pre-Conditions: ${tc.preConditions || '-'}
+Test Data: ${tc.testData || '-'}
+Test Steps: ${tc.testStep || '-'}
+Expected Result: ${tc.expectedResult || '-'}
 
-    bump(inc, status, 1);
-    bump(dec, previousStatus, -1);
+*Actual Results:* ${actualResults || 'N/A'}
+        `.trim();
 
-    const update: Record<string, unknown> = {};
-    if (inc.passed || dec.passed) update.passed = { $inc: { passed: (inc.passed ?? 0) + (dec.passed ?? 0) } };
-    if (inc.failed || dec.failed) update.failed = { $inc: { failed: (inc.failed ?? 0) + (dec.failed ?? 0) } };
-    if (inc.skipped || dec.skipped) update.skipped = { $inc: { skipped: (inc.skipped ?? 0) + (dec.skipped ?? 0) } };
+        // Extract project key from main task (e.g., PLAT-123 -> PLAT)
+        if (!run.jiraIssueKey) throw new Error('Jira issue key is missing');
+        const projectKey = run.jiraIssueKey.split('-')[0];
+        if (!projectKey) throw new Error('Could not extract project key');
 
-    // Apply summary update atomically using $inc
+        // Dynamically resolve 'Bug' issue type if not explicitly set
+        let bugTypeName = (run as any).jiraBugIssueType;
+        if (!bugTypeName) {
+          const issueTypes = await getJiraIssueTypes(projectKey) as Array<{ id: string; name: string }>;
+          const bugType = issueTypes.find((t: { name: string }) => t.name.toLowerCase() === 'bug') || 
+                          issueTypes.find((t: { name: string }) => t.name.toLowerCase().includes('bug')) || 
+                          issueTypes[0];
+          bugTypeName = bugType?.name || 'Bug';
+        }
+
+        const bugIssue = await createJiraIssue({
+          projectKey,
+          summary: `Bug: ${tc.testCase} (${tc.testCaseId})`,
+          description: bugDescription,
+          issueType: bugTypeName,
+        });
+
+        if (run.jiraBugStatus) {
+          await transitionJiraIssue(bugIssue.key, run.jiraBugStatus);
+        }
+
+        (runItem as any).jiraIssueKey = bugIssue.key;
+        await runItem.save();
+
+        // Also comment on the main task
+        await addJiraComment(run.jiraIssueKey as string, `❌ Test Failed: ${tc.testCaseId} - ${tc.testCase}. Bug created: ${bugIssue.key}`);
+      } catch (err) {
+        console.error('Failed to create Bug in Jira:', err);
+      }
+    } else if (status === 'Pass' && run.jiraIssueKey) {
+      try {
+        const tc = runItem.testCase as any;
+        await addJiraComment(run.jiraIssueKey as string, `✅ Test Passed: ${tc.testCaseId} - ${tc.testCase}`);
+      } catch (err) {
+        console.error('Failed to comment on main Jira task:', err);
+      }
+    }
+
     const incObj: { passed?: number; failed?: number; skipped?: number } = {};
-    if ((inc.passed ?? 0) + (dec.passed ?? 0) !== 0) {
-      incObj.passed = (inc.passed ?? 0) + (dec.passed ?? 0);
-    }
-    if ((inc.failed ?? 0) + (dec.failed ?? 0) !== 0) {
-      incObj.failed = (inc.failed ?? 0) + (dec.failed ?? 0);
-    }
-    if ((inc.skipped ?? 0) + (dec.skipped ?? 0) !== 0) {
-      incObj.skipped = (inc.skipped ?? 0) + (dec.skipped ?? 0);
-    }
+    if (previousStatus === 'Pass') incObj.passed = (incObj.passed || 0) - 1;
+    if (previousStatus === 'Fail') incObj.failed = (incObj.failed || 0) - 1;
+    if (previousStatus === 'Skipped') incObj.skipped = (incObj.skipped || 0) - 1;
+
+    if (status === 'Pass') incObj.passed = (incObj.passed || 0) + 1;
+    if (status === 'Fail') incObj.failed = (incObj.failed || 0) + 1;
+    if (status === 'Skipped') incObj.skipped = (incObj.skipped || 0) + 1;
 
     let updatedRun: IRun | null = run;
-
     if (Object.keys(incObj).length > 0) {
       updatedRun = await Run.findByIdAndUpdate(
         run._id,
-        {
-          $inc: incObj,
-        },
-        { new: true },
-      );
-    }
-
-    if (!updatedRun) {
-      const error: ApiError = new Error('Failed to update run summary');
-      error.statusCode = 500;
-      throw error;
-    }
-
-    const remaining = await RunItem.countDocuments({ run: updatedRun._id, status: 'Not Executed' });
-
-    if (remaining === 0 && updatedRun.status === 'In Progress') {
-      updatedRun = await Run.findByIdAndUpdate(
-        updatedRun._id,
-        {
-          status: 'Completed',
-          completedAt: new Date(),
-        },
-        { new: true },
+        { $inc: incObj },
+        { new: true }
       );
     }
 
     res.status(200).json({
       success: true,
-      message: 'Run item updated',
-      data: {
-        item: runItem,
-        run: updatedRun,
-      },
+      data: { item: runItem, run: updatedRun },
     });
   } catch (error) {
     next(error);
@@ -389,23 +364,15 @@ export const cancelRun = async (
   next: NextFunction,
 ): Promise<void> => {
   try {
-    if (!req.user) {
-      const error: ApiError = new Error('User not authenticated');
-      error.statusCode = 401;
-      throw error;
-    }
-
     const { runId } = req.params;
-
     const run = await Run.findById(runId);
-
     if (!run) {
-      const error: ApiError = new Error('Run not found');
-      error.statusCode = 404;
-      throw error;
+      res.status(404).json({ success: false, message: 'Run not found' });
+      return;
     }
 
     if (!(await ensureExecuteRunAccess(run, req))) {
+      res.status(403).json({ success: false, message: 'Unauthorized' });
       return;
     }
 
@@ -413,11 +380,7 @@ export const cancelRun = async (
     run.completedAt = new Date();
     await run.save();
 
-    res.status(200).json({
-      success: true,
-      message: 'Run cancelled',
-      data: run,
-    });
+    res.status(200).json({ success: true, message: 'Run cancelled', data: run });
   } catch (error) {
     next(error);
   }
@@ -430,78 +393,32 @@ export const listRunsHistory = async (
 ): Promise<void> => {
   try {
     if (!req.user) {
-      const error: ApiError = new Error('User not authenticated');
-      error.statusCode = 401;
-      throw error;
-    }
-
-    const page = Number(req.query.page) || 1;
-    const limit = Number(req.query.limit) || 10;
-    const skip = (page - 1) * limit;
-
-    const { platform, status } = req.query as {
-      platform?: string;
-      status?: 'In Progress' | 'Completed' | 'Cancelled';
-    };
-
-    const myTeamIds = await getMyTeamIds(req.user.id);
-    const accessibleSetFilter: Record<string, unknown> = {
-      $or: [
-        { createdBy: new Types.ObjectId(req.user.id) },
-        ...(myTeamIds.length > 0 ? [{ team: { $in: myTeamIds } }] : []),
-      ],
-    };
-
-    if (status) {
-      // status is applied to runs query later
-    }
-
-    if (platform) {
-      accessibleSetFilter.platform = platform;
-    }
-
-    const sets = await RegressionSet.find(accessibleSetFilter).select('_id').lean().exec();
-    const ids = sets.map((s) => s._id);
-
-    if (ids.length === 0) {
-      res.status(200).json({
-        success: true,
-        message: 'Runs history fetched',
-        data: [],
-        pagination: {
-          page,
-          limit,
-          total: 0,
-        },
-      });
+      res.status(401).json({ success: false, message: 'Unauthorized' });
       return;
     }
 
-    const runFilter: Record<string, unknown> = {
-      regressionSet: { $in: ids },
-      ...(status ? { status } : {}),
-    };
+    const teamIds = await getMyTeamIds(req.user.id);
+    const sets = await RegressionSet.find({ team: { $in: teamIds } }).select('_id');
+    const setIds = sets.map(s => s._id);
 
-    const [runs, total] = await Promise.all([
-      Run.find(runFilter)
-        .sort({ createdAt: -1 })
-        .skip(skip)
-        .limit(limit)
-        .populate('regressionSet', 'name platform')
-        .lean()
-        .exec(),
-      Run.countDocuments(runFilter),
-    ]);
+    const { page = 1, limit = 10, status } = req.query as any;
+
+    const query: any = { regressionSet: { $in: setIds } };
+    if (status) query.status = status;
+    
+    const runs = await Run.find(query)
+      .sort({ createdAt: -1 })
+      .skip((page - 1) * limit)
+      .limit(Number(limit))
+      .populate('regressionSet', 'name platform')
+      .populate('startedBy', 'name');
+
+    const total = await Run.countDocuments(query);
 
     res.status(200).json({
       success: true,
-      message: 'Runs history fetched',
       data: runs,
-      pagination: {
-        page,
-        limit,
-        total,
-      },
+      pagination: { total, page: Number(page), limit: Number(limit) },
     });
   } catch (error) {
     next(error);
@@ -514,66 +431,62 @@ export const bulkUpdateRunItems = async (
   next: NextFunction,
 ): Promise<void> => {
   try {
-    if (!req.user) {
-      const error: ApiError = new Error('User not authenticated');
-      error.statusCode = 401;
-      throw error;
-    }
-
     const { runId } = req.params;
     const { status } = req.body as { status: 'Pass' | 'Fail' | 'Skipped' };
 
-    const run = await Run.findById(runId);
+    const run = await Run.findById(runId).populate('regressionSet');
     if (!run) {
-      const error: ApiError = new Error('Run not found');
-      error.statusCode = 404;
-      throw error;
+      res.status(404).json({ success: false, message: 'Run not found' });
+      return;
     }
 
     if (!(await ensureExecuteRunAccess(run, req))) {
+      res.status(403).json({ success: false, message: 'Unauthorized' });
       return;
     }
 
-    if (run.status !== 'In Progress') {
-      const error: ApiError = new Error('Only in-progress runs can be bulk updated');
-      error.statusCode = 400;
-      throw error;
+    const items = await RunItem.find({ run: run._id, status: 'Not Executed' }).populate('testCase');
+    
+    for (const item of items) {
+      item.status = status;
+      item.completedAt = new Date();
+      item.executedBy = new Types.ObjectId(req.user?.id) as any;
+      await item.save();
+      
+      // Auto-Bug on Bulk Failure
+      if (status === 'Fail' && run.jiraIssueKey) {
+        try {
+          const tc = item.testCase as any;
+          const projectKey = run.jiraIssueKey.split('-')[0];
+          const bugIssue = await createJiraIssue({
+            projectKey,
+            summary: `Bug: ${tc.testCase} (${tc.testCaseId})`,
+            description: `Auto-Bug from Bulk Fail in Run ${run._id}\n\nPlatform: ${tc.platform}\nModule: ${tc.module}`,
+            issueType: 'Bug',
+          });
+          item.jiraIssueKey = bugIssue.key;
+          await item.save();
+          await addJiraComment(run.jiraIssueKey, `❌ Bulk Failed: ${tc.testCaseId}. Bug created: ${bugIssue.key}`);
+        } catch (err) {
+          console.error('Bulk bug creation error:', err);
+        }
+      } else if (status === 'Pass' && run.jiraIssueKey) {
+        await addJiraComment(run.jiraIssueKey, `✅ Bulk Passed: ${(item.testCase as any).testCaseId}`);
+      }
     }
 
-    const now = new Date();
-    const pendingItems = await RunItem.find({ run: run._id, status: 'Not Executed' }).select('_id').lean();
-    const pendingCount = pendingItems.length;
+    const count = items.length;
+    if (status === 'Pass') run.passed += count;
+    if (status === 'Fail') run.failed += count;
+    if (status === 'Skipped') run.skipped += count;
 
-    if (pendingCount === 0) {
-      res.status(200).json({
-        success: true,
-        message: 'No pending items to update',
-        data: run,
-      });
-      return;
+    if (run.passed + run.failed + run.skipped === run.totalCases) {
+      run.status = 'Completed';
+      run.completedAt = new Date();
     }
+    await run.save();
 
-    await RunItem.updateMany(
-      { run: run._id, status: 'Not Executed' },
-      { $set: { status, startedAt: now, completedAt: now, executedBy: new Types.ObjectId(req.user.id) } },
-    );
-
-    const incObj: { passed?: number; failed?: number; skipped?: number } = {};
-    if (status === 'Pass') incObj.passed = pendingCount;
-    if (status === 'Fail') incObj.failed = pendingCount;
-    if (status === 'Skipped') incObj.skipped = pendingCount;
-
-    const updatedRun = await Run.findByIdAndUpdate(
-      run._id,
-      { $inc: incObj, $set: { status: 'Completed', completedAt: now } },
-      { new: true },
-    );
-
-    res.status(200).json({
-      success: true,
-      message: `Updated ${pendingCount} items as ${status}`,
-      data: updatedRun,
-    });
+    res.status(200).json({ success: true, message: `Updated ${count} items`, data: run });
   } catch (error) {
     next(error);
   }
@@ -585,84 +498,40 @@ export const exportRunToExcel = async (
   next: NextFunction,
 ): Promise<void> => {
   try {
-    if (!req.user) {
-      const error: ApiError = new Error('User not authenticated');
-      error.statusCode = 401;
-      throw error;
-    }
-
     const { runId } = req.params;
-
-    const run = await Run.findById(runId)
-      .populate('regressionSet', 'name platform')
-      .populate('startedBy', 'name email')
-      .lean()
-      .exec();
-
+    const run = await Run.findById(runId).populate('regressionSet');
     if (!run) {
-      const error: ApiError = new Error('Run not found');
-      error.statusCode = 404;
-      throw error;
-    }
-
-    const regressionSet = await RegressionSet.findById((run as any).regressionSet?._id ?? run.regressionSet);
-    if (!regressionSet) {
-      const error: ApiError = new Error('Regression set not found');
-      error.statusCode = 404;
-      throw error;
-    }
-    const allowed = await canAccessRegressionSet(regressionSet as any, req.user.id);
-    if (!allowed) {
-      res.status(403).json({
-        success: false,
-        message: 'Unauthorized',
-      });
+      res.status(404).json({ success: false, message: 'Run not found' });
       return;
     }
 
-    const runItems = await RunItem.find({ run: run._id })
-      .sort({ order: 1 })
-      .populate('testCase', 'testCaseId module testScenario testCase preConditions expectedResult')
-      .populate('executedBy', 'name email')
-      .lean()
-      .exec();
+    const items = await RunItem.find({ run: run._id }).populate('testCase').populate('executedBy', 'name');
 
     const workbook = new ExcelJS.Workbook();
     const worksheet = workbook.addWorksheet('Test Run Results');
 
     worksheet.columns = [
-      { header: 'Test Case ID', key: 'tcId', width: 15 },
-      { header: 'Module', key: 'module', width: 20 },
-      { header: 'Test Scenario', key: 'scenario', width: 30 },
-      { header: 'Test Case', key: 'testCase', width: 40 },
-      { header: 'Pre-Conditions', key: 'preConditions', width: 30 },
-      { header: 'Expected Result', key: 'expected', width: 30 },
+      { header: 'ID', key: 'id', width: 15 },
+      { header: 'Test Case', key: 'name', width: 30 },
       { header: 'Status', key: 'status', width: 15 },
-      { header: 'Actual Results', key: 'actual', width: 30 },
       { header: 'Executed By', key: 'executedBy', width: 20 },
-      { header: 'Completed At', key: 'completedAt', width: 25 },
+      { header: 'Actual Results', key: 'actual', width: 40 },
+      { header: 'Jira Key', key: 'jira', width: 15 },
     ];
 
-    // Style headers
-    worksheet.getRow(1).font = { bold: true };
-
-    runItems.forEach((item: any) => {
+    items.forEach(item => {
       worksheet.addRow({
-        tcId: item.testCase?.testCaseId,
-        module: item.testCase?.module,
-        scenario: item.testCase?.testScenario,
-        testCase: item.testCase?.testCase,
-        preConditions: item.testCase?.preConditions,
-        expected: item.testCase?.expectedResult,
+        id: (item.testCase as any)?.testCaseId,
+        name: (item.testCase as any)?.testCase,
         status: item.status,
-        actual: item.actualResults || '',
-        executedBy: (item.executedBy as any)?.name || (item.executedBy as any)?.email || (run.startedBy as any)?.name || (run.startedBy as any)?.email || 'Admin',
-        completedAt: item.completedAt ? new Date(item.completedAt).toLocaleString() : '',
+        executedBy: (item.executedBy as any)?.name || 'System',
+        actual: item.actualResults,
+        jira: item.jiraIssueKey || '',
       });
     });
 
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-    res.setHeader('Content-Disposition', `attachment; filename="TestRun_${run._id}.xlsx"`);
+    res.setHeader('Content-Disposition', `attachment; filename=Run_${runId}.xlsx`);
 
     await workbook.xlsx.write(res);
     res.end();
@@ -677,75 +546,44 @@ export const retestFailedSkipped = async (
   next: NextFunction,
 ): Promise<void> => {
   try {
-    if (!req.user) {
-      const error: ApiError = new Error('User not authenticated');
-      error.statusCode = 401;
-      throw error;
-    }
-
     const { runId } = req.params;
-
-    const run = await Run.findById(runId);
-    if (!run) {
-      const error: ApiError = new Error('Run not found');
-      error.statusCode = 404;
-      throw error;
-    }
-
-    if (!(await ensureExecuteRunAccess(run, req))) {
+    const oldRun = await Run.findById(runId);
+    if (!oldRun) {
+      res.status(404).json({ success: false, message: 'Run not found' });
       return;
     }
 
-    // Find items that failed or were skipped
-    const itemsToRetest = await RunItem.find({
-      run: run._id,
-      status: { $in: ['Fail', 'Skipped'] }
-    }).select('_id status').lean();
+    const failedItems = await RunItem.find({ 
+      run: oldRun._id, 
+      status: { $in: ['Fail', 'Skipped'] } 
+    }).sort({ order: 1 });
 
-    if (itemsToRetest.length === 0) {
-      res.status(400).json({
-        success: false,
-        message: 'No failed or skipped items to retest',
-      });
+    if (failedItems.length === 0) {
+      res.status(400).json({ success: false, message: 'No failed or skipped items to retest' });
       return;
     }
 
-    let failCount = 0;
-    let skipCount = 0;
-
-    itemsToRetest.forEach(item => {
-      if (item.status === 'Fail') failCount++;
-      if (item.status === 'Skipped') skipCount++;
+    const newRun = await Run.create({
+      regressionSet: oldRun.regressionSet,
+      startedBy: new Types.ObjectId(req.user?.id),
+      status: 'In Progress',
+      totalCases: failedItems.length,
+      passed: 0,
+      failed: 0,
+      skipped: 0,
     });
 
-    // Reset items
-    await RunItem.updateMany(
-      { _id: { $in: itemsToRetest.map(i => i._id) } },
-      { 
-        $set: { status: 'Not Executed' },
-        $unset: { actualResults: '', completedAt: '', startedAt: '', executedBy: '' }
-      }
-    );
+    const newItems = failedItems.map((item, index) => ({
+      run: newRun._id,
+      testCase: item.testCase,
+      order: index + 1,
+      status: 'Not Executed',
+    }));
 
-    // Update run stats
-    const updatedRun = await Run.findByIdAndUpdate(
-      run._id,
-      {
-        $inc: { failed: -failCount, skipped: -skipCount },
-        $set: { status: 'In Progress' },
-        $unset: { completedAt: '' }
-      },
-      { new: true }
-    );
+    await RunItem.insertMany(newItems);
 
-    res.status(200).json({
-      success: true,
-      message: `${itemsToRetest.length} items reset for retesting`,
-      data: updatedRun,
-    });
+    res.status(201).json({ success: true, data: { runId: newRun._id } });
   } catch (error) {
     next(error);
   }
 };
-
-

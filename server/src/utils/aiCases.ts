@@ -39,305 +39,205 @@ export class LLMRequestError extends Error {
   }
 }
 
-const ALLOWED_PLATFORMS = ['Web', 'iOS', 'Android', 'TV'] as const;
-const MAX_TEST_CASES_PER_REQUEST = 3;
+const MAX_TEST_CASES_PER_REQUEST = 5;
 
-const SYSTEM_PROMPT = `
-You are a senior QA analyst.
-Return ONLY test cases in strict JSON.
-ALL text content inside the JSON MUST be in Turkish language (Türkçe).
+/* ───────────────────────────────────────────────
+   Modal API: Fine-tuned Llama 3.1 8B
+   ─────────────────────────────────────────────── */
 
-OUTPUT FORMAT (STRICT JSON ONLY, NO EXTRA KEYS)
-{
-  "testCases": [
-    {
-      "testCaseId": "TC-001",
-      "userType": "Guest|Registered|Admin",
-      "platform": "Web|iOS|Android|TV",
-      "module": "string",
-      "testScenario": "string",
-      "testCase": "string",
-      "preConditions": "string",
-      "testData": "string",
-      "testStep": "1) ...\\n2) ...\\n3) ...",
-      "expectedResult": "string"
-    }
-  ]
-}
+const MODAL_API_URL =
+  process.env.MODAL_API_URL ??
+  'https://yalkincyaliniz--testcase-generator-api-model-generate.modal.run';
 
-MANDATORY RULES
-1) Return exactly 3 testCases (not less, not more).
-2) Use exactly these keys for each test case.
-3) testCaseId regex: ^TC-[0-9]{3}$.
-4) platform must be one of: Web, iOS, Android, TV.
-5) testStep must be numbered multiline steps with at least 3 steps.
-6) Cover positive + negative + edge/validation scenarios in these 3 cases.
-7) Keep answers concise to reduce token usage.
-8) JSON only. No markdown, no prose, no explanations.
-`.trim();
+/**
+ * Parse free-text Markdown test cases from the Llama model into structured objects.
+ *
+ * The model output looks like:
+ *   **Test Case 1: Miktar Arttırma İşlemi**
+ *   - **Öncelik:** Yüksek
+ *   - **Ön Koşullar:** Ürün sepete eklenmiş olmalı.
+ *   - **Adımlar:**
+ *     1. Sepete git.
+ *     2. Ürün seç.
+ *     3. + butonuna tıkla.
+ *   - **Beklenen Sonuç:** Miktar 1 artmalı.
+ */
+const parseModalResponse = (text: string): AITestCaseSuggestion[] => {
+  // Split by test case headers like "**Test Case 1:" or "**Test Case 1."
+  const testCaseBlocks = text.split(/\*\*Test Case\s*\d+[:.]\s*/i).filter((b) => b.trim().length > 0);
 
-const USER_PROMPT_TEMPLATE = (input: AICaseGenerationInput): string => `
-Generate only 3 test cases for this input.
-All generated content MUST be in Turkish.
+  return testCaseBlocks.map((block, idx) => {
+    // Clean all ** markers for easier parsing
+    const clean = block.replace(/\*\*/g, '');
 
-User story:
-${input.userStory}
-
-Acceptance criteria:
-${input.acceptanceCriteria.map((item, idx) => `${idx + 1}. ${item}`).join('\n')}
-`.trim();
-
-type RawLLMResponse = {
-  testCases?: unknown[];
-  regressionSets?: Array<{
-    name?: unknown;
-    description?: unknown;
-    platform?: unknown;
-    testCases?: unknown[];
-  }>;
-};
-
-const coerceRawTestCases = (raw: RawLLMResponse): unknown[] => {
-  if (Array.isArray(raw.testCases)) return raw.testCases;
-  if (Array.isArray(raw.regressionSets) && Array.isArray(raw.regressionSets[0]?.testCases)) {
-    return raw.regressionSets[0].testCases as unknown[];
-  }
-  return [];
-};
-
-const coerceMeta = (raw: RawLLMResponse): { name: string; description: string; platform: 'Web' | 'iOS' | 'Android' | 'TV' } => {
-  if (!Array.isArray(raw.regressionSets) || !raw.regressionSets[0]) {
-    return {
-      name: 'AI Generated Regression Set',
-      description: 'User story ve acceptance criteria temel alınarak oluşturulmuş öneri seti.',
-      platform: 'Web',
+    const extractField = (pattern: RegExp, fallback: string): string => {
+      const match = clean.match(pattern);
+      return match?.[1]?.trim() || fallback;
     };
-  }
-  const first = raw.regressionSets[0];
-  const platform =
-    typeof first.platform === 'string' && ALLOWED_PLATFORMS.includes(first.platform as any)
-      ? (first.platform as 'Web' | 'iOS' | 'Android' | 'TV')
-      : 'Web';
-  return {
-    name: normalizeText(first.name, 'AI Generated Regression Set'),
-    description: normalizeText(
-      first.description,
-      'User story ve acceptance criteria temel alınarak oluşturulmuş öneri seti.',
-    ),
-    platform,
-  };
-};
 
-/*
-Previous extended prompt intentionally removed for token efficiency and hard-output control.
-*/
-const _LEGACY_PROMPT_REMOVED = true;
+    // Title: first line before any "- " field
+    const titleMatch = clean.match(/^([^\n-]+)/);
+    const title = titleMatch?.[1]?.trim().replace(/\s*[-–—]+\s*$/, '') || `Test Case ${idx + 1}`;
 
-/*
-Old shape reference kept here as a typed contract:
-{
-  "regressionSets": [
-    {
-      "name": "string",
-      "description": "string",
-      "platform": "Web|iOS|Android|TV",
-      "testCases": [
-        {
-          "testCaseId": "TC-001",
-          "userType": "Guest|Registered|Admin",
-          "platform": "Web|iOS|Android|TV",
-          "module": "string",
-          "testScenario": "string",
-          "testCase": "string",
-          "preConditions": "string",
-          "testData": "string",
-          "testStep": "1) ...\\n2) ...\\n3) ...",
-          "expectedResult": "string"
-        }
-      ]
+    // Pre Conditions
+    const preConditions = extractField(
+      /Ön\s*Koşullar\s*:\s*(.+)/i,
+      'Belirli bir ön koşul yok',
+    );
+
+    // Steps: capture multi-line numbered steps
+    const stepsMatch = clean.match(
+      /Adımlar\s*:\s*([\s\S]*?)(?=\n\s*-?\s*Beklenen\s*Sonuç|---|\n\s*$)/i,
+    );
+    let testStep = '1) Adımı uygulayın\n2) Sonucu gözlemleyin\n3) Beklenen davranışı doğrulayın';
+    if (stepsMatch?.[1]) {
+      const lines = stepsMatch[1]
+        .split('\n')
+        .map((l) => l.trim())
+        .filter((l) => l.length > 0)
+        .map((l, i) => `${i + 1}) ${l.replace(/^\d+[.)]\s*/, '')}`);
+      if (lines.length >= 2) {
+        testStep = lines.join('\n');
+      }
     }
-  ]
-}
-*/
 
-const extractJson = (raw: string): string => {
-  const start = raw.indexOf('{');
-  const end = raw.lastIndexOf('}');
-  if (start === -1 || end === -1 || end < start) {
-    throw new Error('LLM response is not valid JSON');
-  }
-  return raw.slice(start, end + 1);
+    // Expected Result
+    const expectedResult = extractField(
+      /Beklenen\s*Sonuç\s*:\s*(.+(?:\n(?!\s*-\s|\s*---).+)*)/i,
+      'Beklenen sonuç doğrulanmalıdır',
+    );
+
+    // Test Data: try to extract from steps or use pre-conditions context
+    const testDataMatch = clean.match(/Test\s*(?:Data|Verisi)\s*:\s*(.+)/i);
+    const testData = testDataMatch?.[1]?.trim() || deriveTestData(preConditions, testStep);
+
+    return {
+      testCaseId: `TC-${String(idx + 1).padStart(3, '0')}`,
+      userType: 'Registered',
+      platform: 'Web' as const,
+      module: 'General',
+      testScenario: title,
+      testCase: title,
+      preConditions,
+      testData,
+      testStep,
+      expectedResult: expectedResult.trim(),
+    };
+  });
 };
 
-const sleep = async (ms: number): Promise<void> =>
-  await new Promise((resolve) => setTimeout(resolve, ms));
+/**
+ * Derive test data from pre-conditions and steps when not explicitly provided.
+ */
+const deriveTestData = (preConditions: string, testStep: string): string => {
+  const hints: string[] = [];
 
-const isLikelyJsonParseError = (error: unknown): boolean => {
-  if (!(error instanceof Error)) return false;
-  const message = error.message.toLowerCase();
-  return (
-    message.includes('json') ||
-    message.includes('expected') ||
-    message.includes('unterminated') ||
-    message.includes('unexpected end')
-  );
+  // Extract quantities, values, specific data from pre-conditions
+  const quantityMatch = preConditions.match(/(\d+)\s*(adet|ürün|stok)/i);
+  if (quantityMatch) {
+    hints.push(`${quantityMatch[1]} ${quantityMatch[2]}`);
+  }
+
+  // Extract specific input values from steps
+  const inputMatch = testStep.match(/"([^"]+)"/);
+  if (inputMatch) {
+    hints.push(`Girdi: "${inputMatch[1]}"`);
+  }
+
+  const numberMatch = testStep.match(/(-?\d+)\s*(?:yazın|girin|değer)/i);
+  if (numberMatch) {
+    hints.push(`Değer: ${numberMatch[1]}`);
+  }
+
+  return hints.length > 0 ? hints.join(', ') : preConditions !== 'Belirli bir ön koşul yok' ? preConditions : 'Standart test verisi';
 };
 
 export const generateRegressionSetsFromText = async (
   input: AICaseGenerationInput,
 ): Promise<AICaseGenerationResult> => {
-  const apiKey = process.env.OPENAI_API_KEY;
-  const model = process.env.OPENAI_MODEL ?? 'gpt-4o-mini';
-  const baseUrl = process.env.OPENAI_BASE_URL ?? 'https://api.openai.com/v1';
+  const userStoryPrompt = `
+**User Story:** ${input.userStory}
 
-  if (!apiKey) {
-    throw new Error('OPENAI_API_KEY is missing');
-  }
+**Acceptance Criteria:**
+${input.acceptanceCriteria.map((item, idx) => `${idx + 1}. ${item}`).join('\n')}
+`.trim();
 
-  const prompt = USER_PROMPT_TEMPLATE(input);
-  const buildPayload = (maxTokens: number) => ({
-    model,
-    temperature: 0.1,
-    max_tokens: maxTokens,
-    response_format: { type: 'json_object' as const },
-    messages: [
-      { role: 'system' as const, content: SYSTEM_PROMPT },
-      { role: 'user' as const, content: prompt },
-    ],
-  });
-
-  const requestAndParse = async (maxTokens: number): Promise<RawLLMResponse> => {
-    const payload = buildPayload(maxTokens);
-
-    let response = await fetch(`${baseUrl}/chat/completions`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify(payload),
-    });
-
-    // Retry once for temporary rate-limits.
-    if (response.status === 429) {
-      await sleep(1200);
-      response = await fetch(`${baseUrl}/chat/completions`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${apiKey}`,
-        },
-        body: JSON.stringify(payload),
-      });
-    }
-
-    if (!response.ok) {
-      let providerMessage = '';
-      try {
-        const errBody = (await response.json()) as {
-          error?: { message?: string; type?: string; code?: string };
-        };
-        providerMessage = errBody.error?.message ?? '';
-      } catch {
-        providerMessage = '';
-      }
-
-      if (response.status === 429) {
-        throw new LLMRequestError(
-          providerMessage ||
-            'AI provider rate limit or quota exceeded. Please retry shortly or check billing/quota.',
-          429,
-          true,
-        );
-      }
-
-      throw new LLMRequestError(
-        providerMessage || `LLM request failed with status ${response.status}`,
-        response.status >= 400 && response.status < 500 ? 400 : 502,
-        false,
-      );
-    }
-
-    const data = (await response.json()) as {
-      choices?: Array<{ message?: { content?: string } }>;
-    };
-    const content = data.choices?.[0]?.message?.content ?? '';
-    return JSON.parse(extractJson(content)) as RawLLMResponse;
-  };
-
+  let response: Response;
   try {
-    const parsed = await requestAndParse(1000);
-    return normalizeAIResult(parsed, MAX_TEST_CASES_PER_REQUEST);
-  } catch (error) {
-    // If provider returned cut/incomplete JSON, retry once with a slightly higher output budget.
-    if (isLikelyJsonParseError(error)) {
-      const parsed = await requestAndParse(1500);
-      return normalizeAIResult(parsed, MAX_TEST_CASES_PER_REQUEST);
-    }
-
-    if (error instanceof LLMRequestError) {
-      throw error;
-    }
-
+    response = await fetch(MODAL_API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ user_story: userStoryPrompt }),
+    });
+  } catch (err) {
     throw new LLMRequestError(
-      error instanceof Error ? error.message : 'Failed to parse AI response',
+      'Modal API\'ye bağlanılamadı. Sunucu uyanıyor olabilir, lütfen tekrar deneyin.',
       502,
-      false,
+      true,
     );
   }
-};
 
-const normalizeText = (value: unknown, fallback = 'N/A'): string => {
-  if (typeof value !== 'string') return fallback;
-  const normalized = value.trim().replace(/\s+/g, ' ');
-  return normalized.length > 0 ? normalized : fallback;
-};
-
-const normalizeMultilineSteps = (value: unknown): string => {
-  if (typeof value !== 'string') return '1) Adımı uygulayın\n2) Sonucu gözlemleyin\n3) Beklenen davranışı doğrulayın';
-  const lines = value
-    .split('\n')
-    .map((line) => line.trim())
-    .filter((line) => line.length > 0)
-    .map((line, idx) => `${idx + 1}) ${line.replace(/^\d+\)\s*/, '')}`);
-  if (lines.length >= 3) return lines.join('\n');
-  return '1) Adımı uygulayın\n2) Sonucu gözlemleyin\n3) Beklenen davranışı doğrulayın';
-};
-
-export const normalizeAIResult = (
-  raw: RawLLMResponse,
-  maxTestCases = MAX_TEST_CASES_PER_REQUEST,
-): AICaseGenerationResult => {
-  const meta = coerceMeta(raw);
-  const rawCases = coerceRawTestCases(raw);
-  const limitedCases = rawCases.slice(0, Math.max(1, maxTestCases));
-
-  if (limitedCases.length === 0) {
-    throw new Error('AI response did not include any test case');
+  if (!response.ok) {
+    throw new LLMRequestError(
+      `Modal API hatası: ${response.status} ${response.statusText}`,
+      response.status >= 400 && response.status < 500 ? 400 : 502,
+      response.status === 503 || response.status === 504,
+    );
   }
 
-  const normalizedCases: AITestCaseSuggestion[] = limitedCases.map((testCase: any, idx) => ({
-    testCaseId: `TC-${String(idx + 1).padStart(3, '0')}`,
-    userType: normalizeText(testCase.userType, 'Registered'),
-    platform: meta.platform,
-    module: normalizeText(testCase.module, 'General'),
-    testScenario: normalizeText(testCase.testScenario, 'Genel senaryo doğrulaması'),
-    testCase: normalizeText(testCase.testCase, 'Fonksiyonel davranış doğrulaması'),
-    preConditions: normalizeText(testCase.preConditions, 'None'),
-    testData: normalizeText(testCase.testData, 'N/A'),
-    testStep: normalizeMultilineSteps(testCase.testStep),
-    expectedResult: normalizeText(testCase.expectedResult, 'Beklenen sonuç doğrulanmalıdır'),
-  }));
+  const data = (await response.json()) as { status?: string; result?: string };
+
+  if (data.status !== 'success' || !data.result) {
+    throw new LLMRequestError('Modal API beklenmeyen yanıt döndü', 502, false);
+  }
+
+  const testCases = parseModalResponse(data.result);
+
+  if (testCases.length === 0) {
+    throw new LLMRequestError('AI yanıtından test case çıkarılamadı', 502, false);
+  }
+
+  const limitedCases = testCases.slice(0, MAX_TEST_CASES_PER_REQUEST);
 
   return {
     regressionSets: [
       {
-        name: meta.name,
-        description: meta.description,
-        platform: meta.platform,
-        testCases: normalizedCases,
+        name: 'AI Generated Regression Set',
+        description: 'User story ve acceptance criteria temel alınarak fine-tuned Llama 3.1 modeli ile oluşturulmuş test seti.',
+        platform: 'Web',
+        testCases: limitedCases,
       },
     ],
   };
 };
 
+/* ───────────────────────────────────────────────
+   Legacy normalizeAIResult kept for backward compat
+   ─────────────────────────────────────────────── */
+export const normalizeAIResult = (
+  raw: { testCases?: any[] },
+  maxTestCases = MAX_TEST_CASES_PER_REQUEST,
+): AICaseGenerationResult => {
+  const cases = (raw.testCases ?? []).slice(0, maxTestCases);
+  return {
+    regressionSets: [
+      {
+        name: 'AI Generated Regression Set',
+        description: 'AI tarafından oluşturulmuş test seti.',
+        platform: 'Web',
+        testCases: cases.map((tc: any, idx: number) => ({
+          testCaseId: `TC-${String(idx + 1).padStart(3, '0')}`,
+          userType: tc.userType ?? 'Registered',
+          platform: tc.platform ?? 'Web',
+          module: tc.module ?? 'General',
+          testScenario: tc.testScenario ?? '',
+          testCase: tc.testCase ?? '',
+          preConditions: tc.preConditions ?? 'None',
+          testData: tc.testData ?? 'N/A',
+          testStep: tc.testStep ?? '',
+          expectedResult: tc.expectedResult ?? '',
+        })),
+      },
+    ],
+  };
+};

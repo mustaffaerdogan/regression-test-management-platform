@@ -21,4 +21,3 @@ export interface AIRegressionSetSuggestion {
 export interface AICasesResponse {
   regressionSets: AIRegressionSetSuggestion[];
 }
-

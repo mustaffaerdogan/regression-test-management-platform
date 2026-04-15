@@ -28,10 +28,20 @@ const handleResponse = async <T>(response: Response): Promise<ApiResponse<T>> =>
 
 export const startRun = async (
   regressionSetId: string,
+  options?: { 
+    jiraProjectKey?: string; 
+    jiraAssignee?: string; 
+    jiraBoardId?: string;
+    jiraStatus?: string;
+    jiraBugIssueType?: string;
+    jiraBugStatus?: string;
+    testCaseIds?: string[];
+  },
 ): Promise<ApiResponse<{ runId: string; totalCases: number }>> => {
   const response = await fetch(`${API_BASE_URL}/test-runs/start/${regressionSetId}`, {
     method: 'POST',
     headers: getAuthHeaders(),
+    body: options ? JSON.stringify(options) : undefined,
   });
 
   return handleResponse<{ runId: string; totalCases: number }>(response);

@@ -43,11 +43,25 @@ A comprehensive SaaS platform for managing regression test suites, test cases, a
 - **Member Management**: Admins can edit member roles (`Admin`, `QA Lead`, `Tester`, `Viewer`) or remove members
 - Role-based access control for all team resources
 
+### 🟦 Jira Operations Hub (Centralized)
+- **Centralized Dashboard**: unified interface for all Jira-related testing operations.
+- **Dual execution flow**:
+    - **Platform Run**: Link existing regression sets to Jira tasks (Existing or auto-created).
+    - **Live Jira Run**: Fetch/Parse test cases directly from Jira comments and execute immediately without permanent importing.
+- **Advanced Comment Parser**:
+    - Supports **multiline fields** (Test Steps, Pre-conditions, Expected Result).
+    - Intelligent detection of numbered lists and complex formatting.
+    - Smart defaults for missing fields to ensure seamless execution.
+- **Auto-Bug Integration**:
+    - **Configurable Status**: Failed tests automatically create bugs in a specific Jira column (e.g., "To Do", "Ready for Fix").
+    - **Configurable Issue Type**: Choice of 'Bug', 'Task', or custom project types.
+    - **Assignee Mapping**: Optional assignee selection for case exports and new task creation.
+- **On-the-fly Task Creation**: Create a brand new Jira container task directly from the execution start screen.
+
 ### 🤖 AI Cases (Powered by LLM)
-- **Jira Integration**: Automatically extract User Story and Acceptance Criteria from Jira task links
-- Generate AI-backed test case suggestions based on requirements
-- Normalized server-side output (max 3 test cases per request)
-- Interactive selection and one-click regression set creation
+- **Jira Story Extraction**: Automatically extract User Story and Acceptance Criteria from Jira task links.
+- **Smart Generation**: Generate AI-backed test case suggestions based on extracted requirements.
+- **One-Click Creation**: Interactive selection and one-click regression set creation from AI output.
 
 ### 📝 Test Case Management
 - Full CRUD operations with rich fields (preconditions, steps, expected results)
@@ -55,11 +69,12 @@ A comprehensive SaaS platform for managing regression test suites, test cases, a
 - Real-time validation and error reporting during import
 
 ### 🚀 Test Run Execution
-- **Resume Capability**: Continue execution of in-progress runs from any device
-- **Retest Logic**: Dedicated "Retest Failed & Skipped" feature to reset only problematic cases while preserving pass streaks
-- **Per-Item Audit**: Every test case execution is tagged with the specific executor's identity
-- **Excel Export**: Export professional test run reports with detailed results and execution logs
-- Bulk mark remaining items as Pass/Fail/Skipped
+- **Jira-Integrated Reporting**: Failed test cases automatically create linked bugs in Jira with full context (Steps, Data, Results).
+- **Resume Capability**: Continue execution of in-progress runs from any device.
+- **Retest Logic**: Dedicated "Retest Failed & Skipped" feature to reset only problematic cases while preserving pass streaks.
+- **Per-Item Audit**: Every test case execution is tagged with the specific executor's identity.
+- **Excel Export**: Export professional test run reports with detailed results and execution logs.
+- **Bulk Operations**: Mass update remaining items for rapid execution.
 
 ### 📊 Dashboard & Analytics
 - Overview cards with real-time pass/fail/skip rates

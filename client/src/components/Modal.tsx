@@ -5,23 +5,24 @@ interface ModalProps {
   onClose: () => void;
   title?: string;
   children: ReactNode;
+  maxWidthClass?: string;
 }
 
-export const Modal = ({ isOpen, onClose, title, children }: ModalProps) => {
+export const Modal = ({ isOpen, onClose, title, children, maxWidthClass = 'max-w-md' }: ModalProps) => {
   if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 px-4">
       <div
-        className="
+        className={`
           w-full bg-white dark:bg-gray-900
           shadow-xl
           h-full sm:h-auto
           rounded-none sm:rounded-xl
-          max-w-md
+          ${maxWidthClass}
           relative
           p-4 sm:p-6
-        "
+        `}
       >
         {/* Close */}
         <button

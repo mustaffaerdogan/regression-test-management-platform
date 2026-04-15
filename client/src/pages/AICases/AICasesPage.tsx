@@ -312,9 +312,15 @@ export const AICasesPage = () => {
                         Select
                       </th>
                       <th className="px-3 py-2 text-left font-medium text-gray-700 dark:text-gray-300">ID</th>
+                      <th className="px-3 py-2 text-left font-medium text-gray-700 dark:text-gray-300">User Type</th>
+                      <th className="px-3 py-2 text-left font-medium text-gray-700 dark:text-gray-300">Platform</th>
                       <th className="px-3 py-2 text-left font-medium text-gray-700 dark:text-gray-300">Module</th>
                       <th className="px-3 py-2 text-left font-medium text-gray-700 dark:text-gray-300">Scenario</th>
-                      <th className="px-3 py-2 text-left font-medium text-gray-700 dark:text-gray-300">Expected</th>
+                      <th className="px-3 py-2 text-left font-medium text-gray-700 dark:text-gray-300">Test Case</th>
+                      <th className="px-3 py-2 text-left font-medium text-gray-700 dark:text-gray-300">Pre Conditions</th>
+                      <th className="px-3 py-2 text-left font-medium text-gray-700 dark:text-gray-300">Test Data</th>
+                      <th className="px-3 py-2 text-left font-medium text-gray-700 dark:text-gray-300">Test Step</th>
+                      <th className="px-3 py-2 text-left font-medium text-gray-700 dark:text-gray-300">Expected Result</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200 dark:divide-gray-800 bg-white dark:bg-gray-900">
@@ -329,8 +335,14 @@ export const AICasesPage = () => {
                           />
                         </td>
                         <td className="px-3 py-2 whitespace-nowrap text-gray-900 dark:text-gray-100">{tc.testCaseId}</td>
+                        <td className="px-3 py-2 whitespace-nowrap text-gray-700 dark:text-gray-200">{tc.userType}</td>
+                        <td className="px-3 py-2 whitespace-nowrap text-gray-700 dark:text-gray-200">{tc.platform}</td>
                         <td className="px-3 py-2 whitespace-nowrap text-gray-700 dark:text-gray-200">{tc.module}</td>
                         <td className="px-3 py-2 text-gray-700 dark:text-gray-200">{tc.testScenario}</td>
+                        <td className="px-3 py-2 text-gray-700 dark:text-gray-200">{tc.testCase}</td>
+                        <td className="px-3 py-2 text-gray-700 dark:text-gray-200">{tc.preConditions}</td>
+                        <td className="px-3 py-2 text-gray-700 dark:text-gray-200">{tc.testData}</td>
+                        <td className="px-3 py-2 text-gray-700 dark:text-gray-200 whitespace-pre-wrap">{tc.testStep}</td>
                         <td className="px-3 py-2 text-gray-700 dark:text-gray-200">{tc.expectedResult}</td>
                       </tr>
                     ))}

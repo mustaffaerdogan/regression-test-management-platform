@@ -12,6 +12,8 @@ import { TestCaseFormModal } from '../../components/TestCaseFormModal';
 import { TestCaseTable } from '../../components/TestCaseTable';
 import { Button } from '../../components/Button';
 import { ImportCsvModal } from './components/ImportCsvModal';
+import { JiraStartRunModal } from '../../components/JiraStartRunModal';
+import { exportCasesToJira } from '../../api/jira';
 
 const formatDate = (value?: string): string => {
   if (!value) return '';
@@ -33,6 +35,7 @@ export const RegressionSetDetailPage = () => {
   const [isSetModalOpen, setIsSetModalOpen] = useState(false);
   const [isTestCaseModalOpen, setIsTestCaseModalOpen] = useState(false);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [isJiraModalOpen, setIsJiraModalOpen] = useState(false);
   const [editingTestCase, setEditingTestCase] = useState<TestCase | undefined>(undefined);
 
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -96,12 +99,14 @@ export const RegressionSetDetailPage = () => {
     setTimeout(() => setSuccessMessage(null), 2000);
   };
 
+  const [jiraMode, setJiraMode] = useState<'start' | 'export'>('start');
+
   const handleStartRun = async () => {
-    if (!regressionSet) return;
+    if (!regressionSet || !id) return;
     setStartingRun(true);
     setError(null);
     try {
-      const response = await startRun(regressionSet._id);
+      const response = await startRun(id);
       const runId = response.data?.runId;
       if (runId) {
         navigate(`/test-runs/${runId}/execute`);
@@ -110,6 +115,57 @@ export const RegressionSetDetailPage = () => {
       setError(err instanceof Error ? err.message : 'Failed to start test run');
     } finally {
       setStartingRun(false);
+    }
+  };
+
+
+  const handleExportToJira = () => {
+    setJiraMode('export');
+    setIsJiraModalOpen(true);
+  };
+
+  const confirmJiraAction = async (jiraData?: { 
+    jiraProjectKey?: string; 
+    jiraAssignee?: string; 
+    jiraBoardId?: string;
+    testCaseIds?: string[];
+    summary?: string;
+    priorityId?: string;
+    jiraStatus?: string;
+    jiraBugIssueType?: string;
+    jiraBugStatus?: string;
+  }) => {
+    if (!regressionSet || !id) return;
+    setStartingRun(true);
+    setError(null);
+    try {
+      if (jiraMode === 'start') {
+        const response = await startRun(id, jiraData);
+        const runId = response.data?.runId;
+        if (runId) {
+          navigate(`/test-runs/${runId}/execute`);
+        }
+      } else {
+        if (jiraData?.jiraProjectKey && jiraData.testCaseIds && jiraData.summary) {
+          await exportCasesToJira({
+            regressionSetId: id,
+            jiraProjectKey: jiraData.jiraProjectKey,
+            jiraAssignee: jiraData.jiraAssignee,
+            jiraBoardId: jiraData.jiraBoardId,
+            testCaseIds: jiraData.testCaseIds,
+            summary: jiraData.summary,
+            priorityId: jiraData.priorityId,
+            jiraStatus: jiraData.jiraStatus,
+          });
+          setSuccessMessage(`${jiraData.testCaseIds.length} test cases exported to Jira successfully`);
+          setTimeout(() => setSuccessMessage(null), 3000);
+        }
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Jira operation failed');
+    } finally {
+      setStartingRun(false);
+      setIsJiraModalOpen(false);
     }
   };
 
@@ -175,36 +231,47 @@ export const RegressionSetDetailPage = () => {
             Created: {formatDate(regressionSet.createdAt)}
           </p>
         </div>
-        <div className="flex gap-3">
-          <Button
-            type="button"
-            className="px-4 py-2 rounded-full"
-            onClick={handleStartRun}
-            disabled={startingRun || (regressionSet.testCases?.length ?? 0) === 0}
-            loading={startingRun}
-          >
-            Start Run
-          </Button>
+        <div className="flex flex-wrap gap-2 sm:justify-end">
           <Button
             type="button"
             variant="secondary"
-            className="px-4 py-2"
-            onClick={() => setIsSetModalOpen(true)}
+            className="px-6 py-2.5 border-indigo-600 text-indigo-600 hover:bg-indigo-50 font-bold"
+            onClick={handleStartRun}
+            disabled={startingRun || (regressionSet.testCases?.length ?? 0) === 0}
           >
-            Edit
+            Start Manual Run
           </Button>
           <Button
             type="button"
-            className="px-4 py-2 bg-red-600 hover:bg-red-700"
-            onClick={handleDeleteSet}
+            className="px-6 py-2.5 bg-blue-500 hover:bg-blue-600 text-white rounded-md font-bold"
+            onClick={handleExportToJira}
+            disabled={startingRun || (regressionSet.testCases?.length ?? 0) === 0}
+            loading={startingRun && jiraMode === 'export'}
           >
-            Delete
+            Export to Jira
           </Button>
+          <div className="flex gap-2">
+            <Button
+              type="button"
+              variant="secondary"
+              className="flex-1 px-4 py-2"
+              onClick={() => setIsSetModalOpen(true)}
+            >
+              Edit
+            </Button>
+            <Button
+              type="button"
+              className="flex-1 px-4 py-2 bg-red-600 hover:bg-red-700"
+              onClick={handleDeleteSet}
+            >
+              Delete
+            </Button>
+          </div>
         </div>
       </div>
 
       {successMessage && (
-        <div className="rounded-md bg-green-50 dark:bg-green-900/20 p-3 text-sm text-green-700 dark:text-green-200">
+        <div className="rounded-2xl bg-green-50 dark:bg-green-900/20 p-4 text-sm text-green-700 dark:text-green-200 border border-green-100 dark:border-green-800 font-bold animate-in fade-in slide-in-from-top-1">
           {successMessage}
         </div>
       )}
@@ -257,6 +324,15 @@ export const RegressionSetDetailPage = () => {
         onClose={() => setIsImportModalOpen(false)}
         regressionSetId={regressionSet._id}
         onImported={fetchData}
+      />
+
+      <JiraStartRunModal
+        isOpen={isJiraModalOpen}
+        onClose={() => setIsJiraModalOpen(false)}
+        onConfirm={confirmJiraAction}
+        loading={startingRun}
+        mode={jiraMode}
+        testCases={regressionSet.testCases}
       />
     </div>
   );
