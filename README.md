@@ -1,6 +1,6 @@
-# 🧪 Regression Test Management Platform
+# Regression Test Management Platform
 
-A comprehensive SaaS platform for managing regression test suites, test cases, and test execution runs. Built with modern web technologies to provide a seamless testing workflow with AI integration and team collaboration.
+SaaS-style regression test suite, case, and execution management with team collaboration, Jira integration, and AI-assisted case generation. Stack: React (Vite), Express, MongoDB.
 
 ![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?style=flat&logo=typescript&logoColor=white)
 ![React](https://img.shields.io/badge/React-20232A?style=flat&logo=react&logoColor=61DAFB)
@@ -8,178 +8,223 @@ A comprehensive SaaS platform for managing regression test suites, test cases, a
 ![MongoDB](https://img.shields.io/badge/MongoDB-4EA94B?style=flat&logo=mongodb&logoColor=white)
 ![Express](https://img.shields.io/badge/Express-000000?style=flat&logo=express&logoColor=white)
 
-## 📋 Table of Contents
+## Table of contents
 
-- [Features](#-features)
-- [Tech Stack](#-tech-stack)
-- [Prerequisites](#-prerequisites)
-- [Installation](#-installation)
-- [Configuration](#-configuration)
-- [Running the Application](#-running-the-application)
-- [API Documentation](#-api-documentation)
-- [Project Structure](#-project-structure)
-- [Key Features](#-key-features)
-- [Security](#-security)
-- [Development](#-development)
-- [Contributing](#-contributing)
-- [License](#-license)
+- [Features](#features)
+- [AI-assisted cases (Modal, crawl, Playwright)](#ai-assisted-cases-modal-crawl-playwright)
+- [Jira ticket format (auto-fill)](#jira-ticket-format-auto-fill)
+- [Tech stack](#tech-stack)
+- [Prerequisites](#prerequisites)
+- [Installation](#installation)
+- [Configuration](#configuration)
+- [Running the application](#running-the-application)
+- [API documentation](#api-documentation)
+- [Security](#security)
+- [Troubleshooting](#troubleshooting)
+- [License](#license)
 
-## ✨ Features
+## Features
 
-### 🔐 Authentication & Profile
-- JWT-based authentication with secure token management
-- **User Profile Settings**: Dedicated page to update Name and Password
-- Password hashing with bcrypt (10 salt rounds)
-- Protected routes with middleware validation
+### Authentication and profile
 
-### 📦 Regression Set Management
-- Create, read, update, and delete regression sets
-- Platform support: Web, iOS, Android, TV
-- Team-scoped visibility with granular access control
-- Team members can view and manage shared regression sets
+- JWT authentication, bcrypt password hashing, protected routes
+- Profile page for name and password updates
 
-### 👥 Team Collaboration & RBAC
-- Create teams and invite members via secure invite codes
-- **Member Management**: Admins can edit member roles (`Admin`, `QA Lead`, `Tester`, `Viewer`) or remove members
-- Role-based access control for all team resources
+### Regression sets and test cases
 
-### 🟦 Jira Operations Hub (Centralized)
-- **Centralized Dashboard**: unified interface for all Jira-related testing operations.
-- **Dual execution flow**:
-    - **Platform Run**: Link existing regression sets to Jira tasks (Existing or auto-created).
-    - **Live Jira Run**: Fetch/Parse test cases directly from Jira comments and execute immediately without permanent importing.
-- **Advanced Comment Parser**:
-    - Supports **multiline fields** (Test Steps, Pre-conditions, Expected Result).
-    - Intelligent detection of numbered lists and complex formatting.
-    - Smart defaults for missing fields to ensure seamless execution.
-- **Auto-Bug Integration**:
-    - **Configurable Status**: Failed tests automatically create bugs in a specific Jira column (e.g., "To Do", "Ready for Fix").
-    - **Configurable Issue Type**: Choice of 'Bug', 'Task', or custom project types.
-    - **Assignee Mapping**: Optional assignee selection for case exports and new task creation.
-- **On-the-fly Task Creation**: Create a brand new Jira container task directly from the execution start screen.
+- CRUD for regression sets (Web / iOS / Android / TV) with team-scoped access
+- Rich test case fields (preconditions, steps, expected results, status)
+- CSV bulk import with validation and duplicate handling
 
-### 🤖 AI Cases (Powered by LLM)
-- **Jira Story Extraction**: Automatically extract User Story and Acceptance Criteria from Jira task links.
-- **Smart Generation**: Generate AI-backed test case suggestions based on extracted requirements.
-- **One-Click Creation**: Interactive selection and one-click regression set creation from AI output.
+### Teams and RBAC
 
-### 📝 Test Case Management
-- Full CRUD operations with rich fields (preconditions, steps, expected results)
-- **CSV Bulk Import**: Import hundreds of test cases with duplicate detection
-- Real-time validation and error reporting during import
+- Teams, invite codes, member roles: Admin, QA Lead, Tester, Viewer
+- Role checks on team resources
 
-### 🚀 Test Run Execution
-- **Jira-Integrated Reporting**: Failed test cases automatically create linked bugs in Jira with full context (Steps, Data, Results).
-- **Resume Capability**: Continue execution of in-progress runs from any device.
-- **Retest Logic**: Dedicated "Retest Failed & Skipped" feature to reset only problematic cases while preserving pass streaks.
-- **Per-Item Audit**: Every test case execution is tagged with the specific executor's identity.
-- **Excel Export**: Export professional test run reports with detailed results and execution logs.
-- **Bulk Operations**: Mass update remaining items for rapid execution.
+### Jira operations hub
 
-### 📊 Dashboard & Analytics
-- Overview cards with real-time pass/fail/skip rates
-- Pass/Fail trend charts with configurable time ranges (7d to 365d)
-- Platform distribution and module failure analytics
-- Performance tracking to identify slow test cases
+- Link regression sets to Jira tasks or run against live Jira-sourced cases
+- Comment parsing for multiline steps, preconditions, expected results
+- Optional auto-creation of bugs on failure (configurable status / issue type)
+- Create container tasks from the run UI
 
-### 🎨 User Interface
-- Modern, premium design with Tailwind CSS
-- **Dynamic Status Badges**: Clearly color-coded results (Green: Pass, Red: Fail, Yellow: Skip)
-- **Dark/Light Mode**: Full theme support with persistence
-- Responsive, mobile-friendly layouts with sidebar navigation
+### Test runs
 
-## 🛠 Tech Stack
+- In-progress runs, resume, retest failed/skipped
+- Per-case executor attribution, Excel export
 
-### Backend
-- **Runtime**: Node.js 18+
-- **Framework**: Express.js 5.x
-- **Language**: TypeScript 5.x
-- **Database**: MongoDB (Atlas) with Mongoose ODM
-- **Integrations**: OpenAI API (for AI Cases), ExcelJS (for Exports)
+### Dashboard
 
-### Frontend
-- **Framework**: React 19.x
-- **Build Tool**: Vite 7.x
-- **Language**: TypeScript 5.x
-- **Styling**: Tailwind CSS 3.x
-- **State Management**: React Context API
+- Pass / fail / skip overview, trends, platform and module views
 
-## 📦 Prerequisites
+### UI
 
-Ensure you have the following installed:
-- **Node.js** 18.17+
-- **npm** 10+
-- **MongoDB** (Local instance or **MongoDB Atlas** account)
-- **OpenAI API Key** (Optional, for AI features)
+- Tailwind-based UI, light/dark theme, responsive layout
 
-## 🚀 Installation
+## AI-assisted cases (Modal, crawl, Playwright)
 
-1. **Clone the Repository**
-   ```bash
-   git clone https://github.com/mustaffaerdogan/regression-test-management-platform.git
-   cd regression-test-management-platform
-   ```
+The **AI Cases** area combines three pieces:
 
-2. **Install Dependencies**
-   ```bash
-   npm install && cd server && npm install && cd ../client && npm install
-   ```
+1. **Story-based generation** — User story plus acceptance criteria are sent to a **Modal-hosted** fine-tuned model (Llama-class). The server parses the model reply into structured test case suggestions. No OpenAI key is required for this path when `MODAL_API_URL` is set.
 
-3. **Configure Environment Variables**
-   - Copy `server/env.example` to `server/.env`
-   - Copy `client/env.example` to `client/.env`
+2. **Jira link auto-fill** — Given a Jira issue URL, the backend calls the Jira REST API and extracts **user story** and **acceptance criteria** with a **deterministic parser** (wiki markup stripping, section headers, bullets, optional Gherkin). This replaces the previous GPT-based extraction.
 
-## ⚙️ Configuration
+3. **URL or HTML crawl** — **Puppeteer** loads the page (with URL validation and SSRF-oriented checks). The server derives several distinct **features** from the DOM (forms, navigation, search, CTAs, etc.), builds focused prompts per feature, calls the Modal model in parallel, filters out obvious negative-only scenarios, and falls back to **template-based** cases if the model output is weak. You can paste raw HTML instead of a URL.
 
-### Backend (`server/.env`)
-```env
-PORT=5000
-FRONTEND_URL=http://localhost:5173
-MONGODB_URI=mongodb+srv://<user>:<password>@cluster.mongodb.net/db_name
-JWT_SECRET=your-32-character-secret
-OPENAI_API_KEY=your-key
-JIRA_EMAIL=your-email@example.com
-JIRA_API_TOKEN=your-token
+4. **Playwright auto-run** — From the same UI you can run generated cases against a URL with **Playwright** (Chromium): step-level pass/fail, errors, optional screenshots. **Headed (“visual”) mode** is intended for **development only**. When you create a regression set from a crawl that was already executed, **Actual results** and **status** can be filled from the Playwright run.
+
+**Headless browser install:** after `npm install` under `server`, `postinstall` runs Puppeteer Chrome and Playwright Chromium installers. If binaries are missing (CI, sandbox, or wrong arch), run:
+
+```bash
+cd server && npm run install:browsers
 ```
 
+On Apple Silicon, use an **arm64** Node install so Playwright fetches the correct Chromium build.
+
+## Jira ticket format (auto-fill)
+
+For the best extraction, use a clear **summary** and a **description** that includes:
+
+- A user story line, e.g. `As a customer, I want …` or `Kullanıcı olarak, … istiyorum.`
+- A section titled **Acceptance Criteria** / **Kabul Kriterleri** (or similar), followed by bullets (`*`, `-`, numbered lines, or checkboxes).
+
+The parser understands common Jira wiki markers (`h2.`, bold, panels); keep list items as full sentences where possible.
+
+## Tech stack
+
+| Layer | Technologies |
+|--------|----------------|
+| Backend | Node.js 18+, Express 5, TypeScript, Mongoose |
+| Frontend | React 19, Vite 7, TypeScript, Tailwind CSS |
+| Database | MongoDB (e.g. Atlas) |
+| AI inference | Modal HTTP endpoint (`MODAL_API_URL`) |
+| Crawl | Puppeteer (Chrome) |
+| Auto execution | Playwright (Chromium) |
+| Exports | ExcelJS |
+
+## Prerequisites
+
+- **Node.js** ≥ 18.17 and **npm** ≥ 10  
+- **MongoDB** (local or Atlas)  
+- **Jira** API token and site URL if you use Jira features  
+- **Modal** deployment URL for AI generation and crawl (see `MODAL_API_URL`)  
+- Disk space for **Chrome + Chromium** downloads on first `server` install  
+
+## Installation
+
+```bash
+git clone https://github.com/mustaffaerdogan/regression-test-management-platform.git
+cd regression-test-management-platform
+npm install
+cd server && npm install
+cd ../client && npm install
+```
+
+Copy environment templates:
+
+- `server/env.example` → `server/.env`  
+- `client/env.example` → `client/.env`  
+
+Adjust `VITE_API_BASE_URL` so it matches the server **port** and `/api` path (e.g. `http://localhost:5005/api` if the API listens on `5005`).
+
+## Configuration
+
+### Backend (`server/.env`)
+
+| Variable | Purpose |
+|----------|---------|
+| `PORT` | API port (on macOS, port **5000** is often taken by AirPlay; **5005** or **5050** is common) |
+| `MONGODB_URI` | Mongo connection string |
+| `JWT_SECRET` | Strong secret for signing JWTs |
+| `CLIENT_URL` | **Production:** exact browser origin allowed by CORS (e.g. `https://app.example.com`). If set in dev, that origin is always allowed; other localhost ports are still allowed in development. |
+| `JIRA_EMAIL` | Jira account email for REST API |
+| `JIRA_API_TOKEN` | Jira API token |
+| `JIRA_BASE_URL` | Site root, e.g. `https://your-domain.atlassian.net` |
+| `MODAL_API_URL` | Modal (or compatible) **generate** endpoint for test case text |
+
+Optional:
+
+| Variable | Purpose |
+|----------|---------|
+| `PUPPETEER_EXECUTABLE_PATH` | Override Chrome/Chromium binary path for crawl |
+| `NODE_ENV` | `production` tightens CORS to `CLIENT_URL` only |
+
+Legacy keys such as `OPENAI_*` in `server/env.example` are **not** used by the current Jira extraction or Modal crawl/generate paths; you can remove them locally if unused.
+
 ### Frontend (`client/.env`)
+
 ```env
 VITE_API_BASE_URL=http://localhost:5000/api
 ```
 
-## 🏃 Running the Application
+Must match the server’s public URL and port.
 
-### Development (Root)
+## Running the application
+
+From the repository root:
+
 ```bash
 npm run dev
 ```
-Starts Backend at `5000` and Frontend at `5173`.
 
-## 📚 API Documentation
+This runs the API and the Vite dev client concurrently. Open the URL printed by Vite (often `http://localhost:5173`; if the port is busy, Vite may use **5174** — in development the API allows localhost origins on any port).
 
-### Authentication & Profile
+Separate processes:
+
+```bash
+npm run dev:server
+npm run dev:client
+```
+
+Production-style:
+
+```bash
+npm run build
+npm start
+```
+
+## API documentation
+
+All AI case routes require authentication (`Authorization: Bearer <jwt>`).
+
+### AI cases (`/api/ai-cases`)
+
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| `POST` | `/api/auth/login` | Login and get JWT |
-| `PUT` | `/api/auth/profile` | Update profile (Name/Password) |
+| `POST` | `/api/ai-cases/generate` | Generate case suggestions from user story + acceptance criteria (Modal) |
+| `POST` | `/api/ai-cases/extract-jira` | Fetch issue by URL; parse story + AC (no LLM) |
+| `POST` | `/api/ai-cases/crawl` | Crawl `url` or parse `html`; return generated cases |
+| `POST` | `/api/ai-cases/run-tests` | Run selected cases with Playwright against a `url` |
 
-### Teams & Members
+### Other (examples)
+
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| `POST` | `/api/teams/:id/invite` | Invite via email |
-| `PUT` | `/api/teams/:id/members/:userId/role` | Edit member role |
+| `POST` | `/api/auth/login` | Login, returns JWT |
+| `PUT` | `/api/auth/profile` | Update profile |
+| `POST` | `/api/test-runs/:runId/retest` | Retest failed/skipped |
+| `GET` | `/api/test-runs/:runId/export` | Excel export |
 
-### Test Runs & Reports
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `POST` | `/api/test-runs/:runId/retest` | Reset Fails/Skips for retest |
-| `GET` | `/api/test-runs/:runId/export` | Export results to Excel |
+## Security
 
-## 🔒 Security
-- **Data Protection**: Sensitive keys are never committed (enforced via `.gitignore`).
-- **Audit Logs**: Every test execution step tracks the `executedBy` user ID.
-- **RBAC**: Strict validation ensures only team owners/admins can modify membership or roles.
+- Secrets belong in `.env` (not committed).
+- Crawl and Playwright flows validate URLs, block common private/hostile targets, and restrict navigation where implemented to reduce SSRF risk.
+- Rate limiting applies to the API; Playwright runs are additionally guarded (payload limits, concurrency, single in-flight run per user where configured).
+- **Production:** set `NODE_ENV=production` and a precise `CLIENT_URL` for CORS.
+
+## Troubleshooting
+
+| Symptom | What to try |
+|---------|----------------|
+| Puppeteer: Chrome not found | `cd server && npx puppeteer browsers install chrome` or set `PUPPETEER_EXECUTABLE_PATH` to a local Chrome |
+| Playwright: executable missing | `cd server && npx playwright install chromium` (use arm64 Node on Apple Silicon) |
+| Browser `Failed to fetch` from the UI | Confirm `VITE_API_BASE_URL` matches the server port; in dev, use a localhost origin. Check `CLIENT_URL` in production. |
+| Jira extract empty | Improve ticket structure (summary + **Kabul Kriterleri** / **Acceptance Criteria** + bullets); ensure `JIRA_*` and `JIRA_BASE_URL` are correct |
+
+## License
+
+MIT
 
 ---
-**Made with ❤️ for quality assurance teams**
-For issues or suggestions, please open an issue on [GitHub](https://github.com/mustaffaerdogan/regression-test-management-platform/issues).
+
+Issues and suggestions: [GitHub issues](https://github.com/mustaffaerdogan/regression-test-management-platform/issues).
