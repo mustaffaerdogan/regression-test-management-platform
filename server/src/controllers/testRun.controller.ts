@@ -457,7 +457,7 @@ export const bulkUpdateRunItems = async (
       if (status === 'Fail' && run.jiraIssueKey) {
         try {
           const tc = item.testCase as any;
-          const projectKey = run.jiraIssueKey.split('-')[0];
+          const projectKey = run.jiraIssueKey!.split('-')[0] as string;
           const bugIssue = await createJiraIssue({
             projectKey,
             summary: `Bug: ${tc.testCase} (${tc.testCaseId})`,

@@ -28,5 +28,8 @@
   "homepage": "https://github.com/mustaffaerdogan/regression-test-management-platform#readme",
   "devDependencies": {
     "concurrently": "^9.0.1"
+  },
+  "dependencies": {
+    "playwright": "^1.59.1"
   }
 }

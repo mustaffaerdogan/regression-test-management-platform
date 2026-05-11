@@ -45,3 +45,74 @@ export const extractJiraDataFromApi = async (
 
   return handleResponse<{ userStory: string; acceptanceCriteria: string[] }>(response);
 };
+
+export const crawlUrl = async (payload: {
+  url?: string;
+  html?: string;
+  cookies?: string;
+}): Promise<any> => {
+  const response = await fetch(`${API_BASE_URL}/ai-cases/crawl`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) {
+    const data = await response.json().catch(() => null);
+    throw new Error(data?.error || 'Sayfa yüklenemedi veya erişim engellendi');
+  }
+  return response.json();
+};
+
+/* ────────────────────────────────────────────────────────────────────────
+   Playwright auto-run types & API
+   ──────────────────────────────────────────────────────────────────────── */
+
+export interface AIStepResult {
+  step: string;
+  status: 'passed' | 'failed' | 'skipped';
+  error?: string;
+  durationMs: number;
+}
+
+export interface AITestRunResult {
+  testCaseId: string;
+  title: string;
+  status: 'passed' | 'failed' | 'skipped';
+  errorMessage?: string;
+  stepResults: AIStepResult[];
+  screenshotBase64?: string;
+  finalUrl?: string;
+  durationMs: number;
+}
+
+export interface AIRunTestsOutput {
+  url: string;
+  startedAt: string;
+  finishedAt: string;
+  durationMs: number;
+  summary: { total: number; passed: number; failed: number; skipped: number };
+  results: AITestRunResult[];
+}
+
+export const runAICasesOnUrl = async (payload: {
+  url: string;
+  headed?: boolean;
+  testCases: Array<{
+    id: string;
+    title: string;
+    preconditions: string[];
+    steps: string[];
+    expectedResults: string[];
+  }>;
+}): Promise<AIRunTestsOutput> => {
+  const response = await fetch(`${API_BASE_URL}/ai-cases/run-tests`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) {
+    const data = await response.json().catch(() => null);
+    throw new Error(data?.error || 'Test koşumu başarısız oldu');
+  }
+  return response.json();
+};

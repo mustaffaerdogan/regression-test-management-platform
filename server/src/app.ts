@@ -12,10 +12,30 @@ const app = express();
 app.use(helmet());
 
 // CORS configuration
-const allowedOrigin = process.env.CLIENT_URL ?? 'http://localhost:5173';
+// In development we accept any localhost / 127.0.0.1 origin so that Vite can fall back to 5174/5175
+// when 5173 is busy. In production CLIENT_URL is the single allowed origin.
+const envOrigin = process.env.CLIENT_URL;
+const isDev = process.env.NODE_ENV !== 'production';
+
+const isAllowedOrigin = (origin: string | undefined): boolean => {
+  if (!origin) return true; // non-browser clients (curl, Postman) or same-origin
+  if (envOrigin && origin === envOrigin) return true;
+  if (!isDev) return false;
+  try {
+    const { hostname, protocol } = new URL(origin);
+    if (protocol !== 'http:' && protocol !== 'https:') return false;
+    return hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1';
+  } catch {
+    return false;
+  }
+};
+
 app.use(
   cors({
-    origin: allowedOrigin,
+    origin: (origin, cb) => {
+      if (isAllowedOrigin(origin)) return cb(null, true);
+      return cb(new Error(`CORS: origin ${origin} reddedildi`));
+    },
     credentials: true,
   }),
 );
